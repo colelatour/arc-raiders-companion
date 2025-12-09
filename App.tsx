@@ -591,8 +591,294 @@ const SafeItemsView = () => {
   );
 };
 
-// --- Admin View ---
-const AdminView = () => {
+// --- Blueprint Manager Component ---
+const BlueprintManager = () => {
+  const [blueprints, setBlueprints] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingBlueprint, setEditingBlueprint] = useState<any>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    workshop: '',
+    recipe: '',
+    is_lootable: false,
+    is_quest_reward: false,
+    is_harvester_event: false,
+    is_trails_reward: false
+  });
+
+  useEffect(() => {
+    loadBlueprints();
+  }, []);
+
+  const loadBlueprints = async () => {
+    try {
+      setIsLoading(true);
+      const response = await admin.getAllBlueprints();
+      setBlueprints(response.data.blueprints);
+    } catch (error: any) {
+      console.error('Failed to load blueprints:', error);
+      alert(error.response?.data?.error || 'Failed to load blueprints. Make sure you have admin permissions.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddNew = () => {
+    setFormData({ 
+      name: '', 
+      workshop: '', 
+      recipe: '', 
+      is_lootable: false, 
+      is_quest_reward: false, 
+      is_harvester_event: false, 
+      is_trails_reward: false 
+    });
+    setShowAddForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingBlueprint) {
+        await admin.updateBlueprint(editingBlueprint.id, formData);
+        alert('Blueprint updated successfully!');
+      } else {
+        await admin.createBlueprint(formData);
+        alert('Blueprint created successfully!');
+      }
+      setShowAddForm(false);
+      setEditingBlueprint(null);
+      setFormData({ name: '', workshop: '', recipe: '', is_lootable: false, is_quest_reward: false, is_harvester_event: false, is_trails_reward: false });
+      loadBlueprints();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to save blueprint');
+    }
+  };
+
+  const handleDelete = async (blueprintId: number) => {
+    if (!confirm(`Delete this blueprint? This will remove it from all players' collections!`)) return;
+    
+    try {
+      await admin.deleteBlueprint(blueprintId);
+      alert('Blueprint deleted successfully!');
+      loadBlueprints();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to delete blueprint');
+    }
+  };
+
+  const startEdit = (blueprint: any) => {
+    setEditingBlueprint(blueprint);
+    setFormData({
+      name: blueprint.name,
+      workshop: blueprint.workshop,
+      recipe: blueprint.recipe || '',
+      is_lootable: blueprint.is_lootable,
+      is_quest_reward: blueprint.is_quest_reward,
+      is_harvester_event: blueprint.is_harvester_event,
+      is_trails_reward: blueprint.is_trails_reward
+    });
+    setShowAddForm(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingBlueprint(null);
+    setFormData({ name: '', workshop: '', recipe: '', is_lootable: false, is_quest_reward: false, is_harvester_event: false, is_trails_reward: false });
+    setShowAddForm(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader className="animate-spin text-arc-accent" size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Blueprint Manager" description="Add, edit, or delete blueprints" />
+        <button
+          onClick={handleAddNew}
+          className="flex items-center gap-2 px-4 py-2 bg-arc-accent text-white rounded font-bold hover:bg-red-700 transition-colors"
+        >
+          <PlusIcon size={20} />
+          Add Blueprint
+        </button>
+      </div>
+
+      {/* Add/Edit Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-arc-accent rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <h3 className="text-2xl font-bold text-white mb-6">
+              {editingBlueprint ? `Edit Blueprint: ${editingBlueprint.name}` : 'Add New Blueprint'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Blueprint Name *</label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Workshop *</label>
+                  <input
+                    type="text"
+                    value={formData.workshop}
+                    onChange={(e) => setFormData({ ...formData, workshop: e.target.value })}
+                    className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                    placeholder="e.g., Equipment, Weapon, Gear"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Recipe (optional)</label>
+                <textarea
+                  value={formData.recipe}
+                  onChange={(e) => setFormData({ ...formData, recipe: e.target.value })}
+                  className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                  placeholder="Crafting materials and requirements"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_lootable}
+                    onChange={(e) => setFormData({ ...formData, is_lootable: e.target.checked })}
+                    className="w-4 h-4 bg-arc-800 border border-arc-700 rounded text-arc-accent focus:ring-arc-accent"
+                  />
+                  <span className="text-sm text-gray-300">Lootable</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_quest_reward}
+                    onChange={(e) => setFormData({ ...formData, is_quest_reward: e.target.checked })}
+                    className="w-4 h-4 bg-arc-800 border border-arc-700 rounded text-arc-accent focus:ring-arc-accent"
+                  />
+                  <span className="text-sm text-gray-300">Quest Reward</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_harvester_event}
+                    onChange={(e) => setFormData({ ...formData, is_harvester_event: e.target.checked })}
+                    className="w-4 h-4 bg-arc-800 border border-arc-700 rounded text-arc-accent focus:ring-arc-accent"
+                  />
+                  <span className="text-sm text-gray-300">Harvester Event</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.is_trails_reward}
+                    onChange={(e) => setFormData({ ...formData, is_trails_reward: e.target.checked })}
+                    className="w-4 h-4 bg-arc-800 border border-arc-700 rounded text-arc-accent focus:ring-arc-accent"
+                  />
+                  <span className="text-sm text-gray-300">Trails Reward</span>
+                </label>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-arc-700">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded font-bold hover:bg-green-700 transition-colors"
+                >
+                  <Save size={18} />
+                  {editingBlueprint ? 'Update Blueprint' : 'Create Blueprint'}
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelEdit}
+                  className="px-6 py-3 bg-arc-700 text-gray-300 rounded font-bold hover:bg-arc-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Blueprint List */}
+      <div className="space-y-3">
+        {blueprints.map((blueprint) => (
+          <div key={blueprint.id} className="bg-arc-800 border border-arc-700 rounded-lg p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white mb-1">
+                  {blueprint.name}
+                </h3>
+                <p className="text-sm text-gray-500 mb-2">🔨 {blueprint.workshop}</p>
+                
+                {blueprint.recipe && (
+                  <p className="text-sm text-gray-400 mb-2 italic">{blueprint.recipe}</p>
+                )}
+                
+                <div className="flex flex-wrap gap-2">
+                  {blueprint.is_lootable && (
+                    <span className="text-xs bg-blue-900/30 text-blue-400 px-2 py-1 rounded">Lootable</span>
+                  )}
+                  {blueprint.is_quest_reward && (
+                    <span className="text-xs bg-purple-900/30 text-purple-400 px-2 py-1 rounded">Quest Reward</span>
+                  )}
+                  {blueprint.is_harvester_event && (
+                    <span className="text-xs bg-red-900/30 text-red-400 px-2 py-1 rounded">Harvester Event</span>
+                  )}
+                  {blueprint.is_trails_reward && (
+                    <span className="text-xs bg-yellow-900/30 text-yellow-400 px-2 py-1 rounded">Trails Reward</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2 ml-4">
+                <button
+                  onClick={() => startEdit(blueprint)}
+                  className="p-2 bg-blue-900/30 text-blue-400 rounded hover:bg-blue-900/50 transition-colors"
+                  title="Edit Blueprint"
+                >
+                  <Edit size={18} />
+                </button>
+                <button
+                  onClick={() => handleDelete(blueprint.id)}
+                  className="p-2 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50 transition-colors"
+                  title="Delete Blueprint"
+                >
+                  <TrashIcon size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {blueprints.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Hammer size={48} className="mx-auto mb-4 opacity-50" />
+          <p>No blueprints found. Click "Add Blueprint" to create one.</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Quest Manager Component ---
+const QuestManager = () => {
   const [quests, setQuests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingQuest, setEditingQuest] = useState<any>(null);
@@ -915,6 +1201,52 @@ const AdminView = () => {
   );
 };
 
+// --- Admin View with Tabs ---
+const AdminView = () => {
+  const [activeTab, setActiveTab] = useState<'quests' | 'blueprints'>('quests');
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b border-arc-700 pb-4">
+        <button
+          onClick={() => setActiveTab('quests')}
+          className={`
+            px-6 py-3 rounded-t font-bold uppercase tracking-wide transition-all duration-200
+            ${activeTab === 'quests' 
+              ? 'bg-arc-accent text-white shadow-lg' 
+              : 'bg-arc-800 text-gray-400 hover:text-white hover:bg-arc-700'
+            }
+          `}
+        >
+          <div className="flex items-center gap-2">
+            <Scroll size={20} />
+            Quest Manager
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('blueprints')}
+          className={`
+            px-6 py-3 rounded-t font-bold uppercase tracking-wide transition-all duration-200
+            ${activeTab === 'blueprints' 
+              ? 'bg-arc-accent text-white shadow-lg' 
+              : 'bg-arc-800 text-gray-400 hover:text-white hover:bg-arc-700'
+            }
+          `}
+        >
+          <div className="flex items-center gap-2">
+            <Hammer size={20} />
+            Blueprint Manager
+          </div>
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'quests' ? <QuestManager /> : <BlueprintManager />}
+    </div>
+  );
+};
+
 // --- Main App ---
 export default function App() {
   const { user, logout } = useAuth();
@@ -970,7 +1302,7 @@ export default function App() {
             <SidebarItem icon={Hammer} label="Workbench" isActive={currentView === 'crafting'} onClick={() => navigate('crafting')} />
             <SidebarItem icon={Trash2} label="Safe Items" isActive={currentView === 'safe-items'} onClick={() => navigate('safe-items')} />
             {isAdmin && (
-              <SidebarItem icon={Settings} label="Quest Manager" isActive={currentView === 'admin'} onClick={() => navigate('admin')} />
+              <SidebarItem icon={Settings} label="Database Manager" isActive={currentView === 'admin'} onClick={() => navigate('admin')} />
             )}
           </nav>
           
