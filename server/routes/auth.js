@@ -44,9 +44,9 @@ router.post('/register', async (req, res) => {
 
     // Create default raider profile
     await pool.query(
-      `INSERT INTO raider_profiles (user_id, raider_name, expedition_level) 
-       VALUES ($1, $2, 0)`,
-      [newUser.id, 'Default Raider']
+      `INSERT INTO raider_profiles (user_id, expedition_level) 
+       VALUES ($1, 0)`,
+      [newUser.id]
     );
 
     // Generate JWT

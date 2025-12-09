@@ -1,8 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { AuthProvider } from './AuthContext';
-import { useAuth } from './AuthContext';
-import { LoginPage } from './LoginPage';
+import { AuthProvider } from './contexts/AuthContext';
+import { useAuth } from './contexts/AuthContext';
+import { LoginPage } from './components/LoginPage';
 import App from './App';
 import { Loader } from 'lucide-react';
 

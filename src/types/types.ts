@@ -4,6 +4,7 @@ export interface Quest {
   objectives: string[];
   locations: string;
   rewards: string[];
+  url?: string;
   notes?: string;
 }
 
@@ -31,4 +32,4 @@ export interface SafeItem {
   description?: string;
 }
 
-export type ViewState = 'home' | 'quests' | 'blueprints' | 'crafting' | 'safe-items';
+export type ViewState = 'home' | 'quests' | 'blueprints' | 'workbenches' | 'expedition-parts' | 'safe-items' | 'raider-search';
