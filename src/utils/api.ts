@@ -126,6 +126,9 @@ export const admin = {
   
   updateUserRole: (userId: number, role: string) =>
     api.put(`/admin/users/${userId}/role`, { role }),
+  
+  updateUserExpeditionLevel: (userId: number, expeditionLevel: number) =>
+    api.put(`/admin/users/${userId}/expedition-level`, { expeditionLevel }),
 };
 
 export default api;

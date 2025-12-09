@@ -291,9 +291,13 @@ router.delete('/blueprints/:id', async (req, res) => {
 // Get all users (exclude passwords)
 router.get('/users', async (req, res) => {
   try {
-    const users = await pool.query(
-      'SELECT id, email, username, role, created_at, last_login, is_active FROM users ORDER BY id'
-    );
+    const users = await pool.query(`
+      SELECT u.id, u.email, u.username, u.role, u.created_at, u.last_login, u.is_active,
+             rp.expedition_level
+      FROM users u
+      LEFT JOIN raider_profiles rp ON u.id = rp.user_id
+      ORDER BY u.id
+    `);
     res.json({ users: users.rows });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -393,6 +397,39 @@ router.put('/users/:id/role', async (req, res) => {
   } catch (error) {
     console.error('Error updating user role:', error);
     res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
+// Update user expedition level
+router.put('/users/:id/expedition-level', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { expeditionLevel } = req.body;
+  
+  try {
+    // Validation
+    if (expeditionLevel === undefined || expeditionLevel === null) {
+      return res.status(400).json({ error: 'Expedition level is required' });
+    }
+    
+    const level = parseInt(expeditionLevel);
+    if (isNaN(level) || level < 0) {
+      return res.status(400).json({ error: 'Expedition level must be a positive number or 0' });
+    }
+    
+    // Update expedition level in raider_profiles
+    const result = await pool.query(
+      'UPDATE raider_profiles SET expedition_level = $1 WHERE user_id = $2 RETURNING id',
+      [level, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User profile not found' });
+    }
+    
+    res.json({ message: 'Expedition level updated successfully' });
+  } catch (error) {
+    console.error('Error updating expedition level:', error);
+    res.status(500).json({ error: 'Failed to update expedition level' });
   }
 });
 

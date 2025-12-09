@@ -2348,6 +2348,26 @@ const UserManager = () => {
     }
   };
 
+  const handleExpeditionLevelChange = async (userId: number, currentLevel: number, username: string) => {
+    const newLevel = prompt(`Enter new expedition level for "${username}" (current: ${currentLevel}):`, currentLevel.toString());
+    
+    if (newLevel === null) return; // User cancelled
+    
+    const level = parseInt(newLevel);
+    if (isNaN(level) || level < 0) {
+      alert('Please enter a valid number (0 or greater)');
+      return;
+    }
+    
+    try {
+      await admin.updateUserExpeditionLevel(userId, level);
+      alert(`Expedition level updated to ${level} successfully!`);
+      loadUsers();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update expedition level');
+    }
+  };
+
   const cancelAdd = () => {
     setFormData({ email: '', username: '', password: '', role: 'user' });
     setShowAddForm(false);
@@ -2458,6 +2478,7 @@ const UserManager = () => {
               <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Username</th>
               <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Email</th>
               <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Role</th>
+              <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Expedition</th>
               <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Created</th>
               <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Last Login</th>
               <th className="text-center p-3 text-xs uppercase text-gray-500 font-bold">Actions</th>
@@ -2479,6 +2500,15 @@ const UserManager = () => {
                     title="Click to change role"
                   >
                     {user.role.toUpperCase()}
+                  </button>
+                </td>
+                <td className="p-3">
+                  <button
+                    onClick={() => handleExpeditionLevelChange(user.id, user.expedition_level || 0, user.username)}
+                    className="text-xs px-2 py-1 rounded font-bold cursor-pointer transition-all hover:scale-105 bg-arc-gold/20 text-arc-gold hover:bg-arc-gold/30"
+                    title="Click to change expedition level"
+                  >
+                    Level {user.expedition_level || 0}
                   </button>
                 </td>
                 <td className="p-3 text-gray-500 text-sm">
