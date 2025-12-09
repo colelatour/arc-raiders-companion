@@ -1,0 +1,5 @@
+{
+  "name": "ARC Raiders Companion",
+  "description": "A tracker for ARC Raiders quests, blueprints, crafting requirements, and safe-to-sell items based on community spreadsheets.",
+  "requestFramePermissions": []
+}
