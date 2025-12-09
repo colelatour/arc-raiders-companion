@@ -11,6 +11,7 @@ CREATE TABLE users (
     email VARCHAR(255) UNIQUE NOT NULL,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
@@ -19,23 +20,27 @@ CREATE TABLE users (
 
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_role ON users(role);
+
+COMMENT ON COLUMN users.role IS 'User role: user or admin';
 
 -- ============================================================
--- RAIDER PROFILES (Multiple profiles per user)
+-- RAIDER PROFILES (One profile per user)
 -- ============================================================
 
 CREATE TABLE raider_profiles (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    raider_name VARCHAR(100) NOT NULL,
     expedition_level INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
-    UNIQUE(user_id, raider_name)
+    UNIQUE(user_id)
 );
 
 CREATE INDEX idx_raider_profiles_user_id ON raider_profiles(user_id);
+
+COMMENT ON TABLE raider_profiles IS 'Each user has one raider profile, identified by their username';
 
 -- ============================================================
 -- GAME DATA - QUESTS
@@ -45,6 +50,7 @@ CREATE TABLE quests (
     id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     locations TEXT,
+    url VARCHAR(500),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -102,6 +108,81 @@ CREATE TABLE raider_owned_blueprints (
 );
 
 CREATE INDEX idx_raider_owned_blueprints_profile ON raider_owned_blueprints(raider_profile_id);
+
+-- ============================================================
+-- WORKBENCHES & PROGRESS TRACKING
+-- ============================================================
+
+CREATE TABLE workbenches (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    category VARCHAR(100) NOT NULL,
+    level INTEGER NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_workbenches_category ON workbenches(category);
+
+COMMENT ON TABLE workbenches IS 'All available workbench/station levels';
+
+-- User's completed workbenches
+CREATE TABLE raider_completed_workbenches (
+    id SERIAL PRIMARY KEY,
+    raider_profile_id INTEGER NOT NULL REFERENCES raider_profiles(id) ON DELETE CASCADE,
+    workbench_id INTEGER NOT NULL REFERENCES workbenches(id) ON DELETE CASCADE,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(raider_profile_id, workbench_id)
+);
+
+CREATE INDEX idx_raider_completed_workbenches_profile ON raider_completed_workbenches(raider_profile_id);
+
+COMMENT ON TABLE raider_completed_workbenches IS 'Tracks which workbench levels each raider has completed';
+
+-- ============================================================
+-- FAVORITE RAIDERS
+-- ============================================================
+
+CREATE TABLE favorite_raiders (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    raider_profile_id INTEGER NOT NULL REFERENCES raider_profiles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, raider_profile_id)
+);
+
+CREATE INDEX idx_favorite_raiders_user_id ON favorite_raiders(user_id);
+
+COMMENT ON TABLE favorite_raiders IS 'Stores bookmarked/favorite raiders for quick access';
+
+-- ============================================================
+-- EXPEDITION PARTS TRACKING
+-- ============================================================
+
+CREATE TABLE expedition_parts (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) UNIQUE NOT NULL,
+    part_number INTEGER NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_expedition_parts_part_number ON expedition_parts(part_number);
+
+COMMENT ON TABLE expedition_parts IS 'All 5 expedition parts that need to be completed';
+
+-- User's completed expedition parts
+CREATE TABLE raider_completed_expedition_parts (
+    id SERIAL PRIMARY KEY,
+    raider_profile_id INTEGER NOT NULL REFERENCES raider_profiles(id) ON DELETE CASCADE,
+    expedition_part_id INTEGER NOT NULL REFERENCES expedition_parts(id) ON DELETE CASCADE,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(raider_profile_id, expedition_part_id)
+);
+
+CREATE INDEX idx_raider_completed_expedition_parts_profile ON raider_completed_expedition_parts(raider_profile_id);
+
+COMMENT ON TABLE raider_completed_expedition_parts IS 'Tracks which expedition parts each raider has completed';
 
 -- ============================================================
 -- GAME DATA - CRAFTING ITEMS
@@ -178,15 +259,16 @@ CREATE TRIGGER update_raider_profiles_updated_at
 
 -- Get raider stats
 -- SELECT 
---   rp.raider_name,
+--   u.username,
 --   rp.expedition_level,
 --   COUNT(DISTINCT rcq.quest_id) as quests_completed,
 --   COUNT(DISTINCT rob.blueprint_id) as blueprints_owned
 -- FROM raider_profiles rp
+-- JOIN users u ON rp.user_id = u.id
 -- LEFT JOIN raider_completed_quests rcq ON rp.id = rcq.raider_profile_id
 -- LEFT JOIN raider_owned_blueprints rob ON rp.id = rob.raider_profile_id
 -- WHERE rp.id = 1
--- GROUP BY rp.id, rp.raider_name, rp.expedition_level;
+-- GROUP BY rp.id, u.username, rp.expedition_level;
 
 -- ============================================================
 -- DATA INSERTS - QUESTS
@@ -546,6 +628,57 @@ INSERT INTO safe_items (item_name, category, description) VALUES
 ('Torn Book', 'Sell', NULL),
 ('Vase', 'Sell', NULL),
 ('Volcanic Rock', 'Sell', NULL);
+
+-- ============================================================
+-- INITIAL WORKBENCH DATA
+-- ============================================================
+
+-- Insert workbench levels (Scrappy starts at level 2, all others have levels 1-3)
+INSERT INTO workbenches (name, category, level, display_order) VALUES
+-- Scrappy (levels 2-5)
+('Scrappy 2', 'Scrappy', 2, 1),
+('Scrappy 3', 'Scrappy', 3, 1),
+('Scrappy 4', 'Scrappy', 4, 1),
+('Scrappy 5', 'Scrappy', 5, 1),
+
+-- Gunsmith (levels 1-3)
+('Gunsmith 1', 'Gunsmith', 1, 2),
+('Gunsmith 2', 'Gunsmith', 2, 2),
+('Gunsmith 3', 'Gunsmith', 3, 2),
+
+-- Medical Lab (levels 1-3)
+('Medical Lab 1', 'Medical Lab', 1, 3),
+('Medical Lab 2', 'Medical Lab', 2, 3),
+('Medical Lab 3', 'Medical Lab', 3, 3),
+
+-- Utility Station (levels 1-3)
+('Utility Station 1', 'Utility Station', 1, 4),
+('Utility Station 2', 'Utility Station', 2, 4),
+('Utility Station 3', 'Utility Station', 3, 4),
+
+-- Explosives Bench (levels 1-3)
+('Explosives Bench 1', 'Explosives Bench', 1, 5),
+('Explosives Bench 2', 'Explosives Bench', 2, 5),
+('Explosives Bench 3', 'Explosives Bench', 3, 5),
+
+-- Refiner (levels 1-3)
+('Refiner 1', 'Refiner', 1, 6),
+('Refiner 2', 'Refiner', 2, 6),
+('Refiner 3', 'Refiner', 3, 6)
+ON CONFLICT (name) DO NOTHING;
+
+-- ============================================================
+-- INITIAL EXPEDITION PARTS DATA
+-- ============================================================
+
+-- Insert expedition parts (5 parts)
+INSERT INTO expedition_parts (name, part_number, display_order) VALUES
+('Part 1', 1, 1),
+('Part 2', 2, 2),
+('Part 3', 3, 3),
+('Part 4', 4, 4),
+('Part 5', 5, 5)
+ON CONFLICT (name) DO NOTHING;
 
 -- ============================================================
 -- NOTES

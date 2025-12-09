@@ -11,7 +11,7 @@ router.use(authenticateToken);
 router.get('/profiles', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, raider_name, expedition_level, created_at, updated_at 
+      `SELECT id, expedition_level, created_at, updated_at 
        FROM raider_profiles 
        WHERE user_id = $1 AND is_active = true 
        ORDER BY created_at ASC`,
@@ -27,28 +27,22 @@ router.get('/profiles', async (req, res) => {
 
 // Create new raider profile
 router.post('/profiles', async (req, res) => {
-  const { raiderName } = req.body;
-
   try {
-    if (!raiderName || raiderName.trim().length === 0) {
-      return res.status(400).json({ error: 'Raider name is required' });
-    }
-
-    // Check if name already exists for this user
+    // Check if user already has a profile
     const existing = await pool.query(
-      'SELECT id FROM raider_profiles WHERE user_id = $1 AND raider_name = $2',
-      [req.user.userId, raiderName.trim()]
+      'SELECT id FROM raider_profiles WHERE user_id = $1',
+      [req.user.userId]
     );
 
     if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'Raider name already exists' });
+      return res.status(409).json({ error: 'Profile already exists for this user' });
     }
 
     const result = await pool.query(
-      `INSERT INTO raider_profiles (user_id, raider_name, expedition_level) 
-       VALUES ($1, $2, 0) 
-       RETURNING id, raider_name, expedition_level, created_at`,
-      [req.user.userId, raiderName.trim()]
+      `INSERT INTO raider_profiles (user_id, expedition_level) 
+       VALUES ($1, 0) 
+       RETURNING id, expedition_level, created_at`,
+      [req.user.userId]
     );
 
     res.status(201).json({ profile: result.rows[0] });
@@ -97,7 +91,6 @@ router.get('/profiles/:profileId/stats', async (req, res) => {
 
     const stats = await pool.query(
       `SELECT 
-        rp.raider_name,
         rp.expedition_level,
         COUNT(DISTINCT rcq.quest_id) as quests_completed,
         COUNT(DISTINCT rob.blueprint_id) as blueprints_owned
@@ -105,7 +98,7 @@ router.get('/profiles/:profileId/stats', async (req, res) => {
        LEFT JOIN raider_completed_quests rcq ON rp.id = rcq.raider_profile_id
        LEFT JOIN raider_owned_blueprints rob ON rp.id = rob.raider_profile_id
        WHERE rp.id = $1
-       GROUP BY rp.id, rp.raider_name, rp.expedition_level`,
+       GROUP BY rp.id, rp.expedition_level`,
       [profileId]
     );
 
@@ -240,6 +233,140 @@ router.post('/profiles/:profileId/blueprints/:blueprintName', async (req, res) =
   }
 });
 
+// Get completed workbenches for a profile
+router.get('/profiles/:profileId/workbenches', async (req, res) => {
+  const { profileId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT w.name FROM raider_completed_workbenches rcw
+       JOIN workbenches w ON rcw.workbench_id = w.id
+       WHERE rcw.raider_profile_id = $1 
+       AND rcw.raider_profile_id IN (
+         SELECT id FROM raider_profiles WHERE user_id = $2
+       )`,
+      [profileId, req.user.userId]
+    );
+
+    res.json({ completedWorkbenches: result.rows.map(r => r.name) });
+  } catch (error) {
+    console.error('Error fetching workbenches:', error);
+    res.status(500).json({ error: 'Failed to fetch workbenches' });
+  }
+});
+
+// Toggle workbench completion
+router.post('/profiles/:profileId/workbenches/:workbenchName', async (req, res) => {
+  const { profileId, workbenchName } = req.params;
+
+  try {
+    // Get workbench ID
+    const workbench = await pool.query('SELECT id FROM workbenches WHERE name = $1', [workbenchName]);
+    
+    if (workbench.rows.length === 0) {
+      return res.status(404).json({ error: 'Workbench not found' });
+    }
+
+    const workbenchId = workbench.rows[0].id;
+
+    // Check if already completed
+    const existing = await pool.query(
+      `SELECT id FROM raider_completed_workbenches 
+       WHERE raider_profile_id = $1 AND workbench_id = $2
+       AND raider_profile_id IN (
+         SELECT id FROM raider_profiles WHERE user_id = $3
+       )`,
+      [profileId, workbenchId, req.user.userId]
+    );
+
+    if (existing.rows.length > 0) {
+      // Remove completion
+      await pool.query(
+        'DELETE FROM raider_completed_workbenches WHERE raider_profile_id = $1 AND workbench_id = $2',
+        [profileId, workbenchId]
+      );
+      res.json({ completed: false });
+    } else {
+      // Add completion
+      await pool.query(
+        'INSERT INTO raider_completed_workbenches (raider_profile_id, workbench_id) VALUES ($1, $2)',
+        [profileId, workbenchId]
+      );
+      res.json({ completed: true });
+    }
+  } catch (error) {
+    console.error('Error toggling workbench:', error);
+    res.status(500).json({ error: 'Failed to toggle workbench' });
+  }
+});
+
+// Get completed expedition parts for a profile
+router.get('/profiles/:profileId/expedition-parts', async (req, res) => {
+  const { profileId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT ep.name FROM raider_completed_expedition_parts rcep
+       JOIN expedition_parts ep ON rcep.expedition_part_id = ep.id
+       WHERE rcep.raider_profile_id = $1 
+       AND rcep.raider_profile_id IN (
+         SELECT id FROM raider_profiles WHERE user_id = $2
+       )`,
+      [profileId, req.user.userId]
+    );
+
+    res.json({ completedExpeditionParts: result.rows.map(r => r.name) });
+  } catch (error) {
+    console.error('Error fetching expedition parts:', error);
+    res.status(500).json({ error: 'Failed to fetch expedition parts' });
+  }
+});
+
+// Toggle expedition part completion
+router.post('/profiles/:profileId/expedition-parts/:partName', async (req, res) => {
+  const { profileId, partName } = req.params;
+
+  try {
+    // Get expedition part ID
+    const expeditionPart = await pool.query('SELECT id FROM expedition_parts WHERE name = $1', [partName]);
+    
+    if (expeditionPart.rows.length === 0) {
+      return res.status(404).json({ error: 'Expedition part not found' });
+    }
+
+    const expeditionPartId = expeditionPart.rows[0].id;
+
+    // Check if already completed
+    const existing = await pool.query(
+      `SELECT id FROM raider_completed_expedition_parts 
+       WHERE raider_profile_id = $1 AND expedition_part_id = $2
+       AND raider_profile_id IN (
+         SELECT id FROM raider_profiles WHERE user_id = $3
+       )`,
+      [profileId, expeditionPartId, req.user.userId]
+    );
+
+    if (existing.rows.length > 0) {
+      // Remove completion
+      await pool.query(
+        'DELETE FROM raider_completed_expedition_parts WHERE raider_profile_id = $1 AND expedition_part_id = $2',
+        [profileId, expeditionPartId]
+      );
+      res.json({ completed: false });
+    } else {
+      // Add completion
+      await pool.query(
+        'INSERT INTO raider_completed_expedition_parts (raider_profile_id, expedition_part_id) VALUES ($1, $2)',
+        [profileId, expeditionPartId]
+      );
+      res.json({ completed: true });
+    }
+  } catch (error) {
+    console.error('Error toggling expedition part:', error);
+    res.status(500).json({ error: 'Failed to toggle expedition part' });
+  }
+});
+
 // Increment expedition level (wipe progress)
 router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
   const { profileId } = req.params;
@@ -279,6 +406,18 @@ router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
         [profileId]
       );
 
+      // Wipe workbench progress
+      await client.query(
+        'DELETE FROM raider_completed_workbenches WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Wipe expedition parts progress
+      await client.query(
+        'DELETE FROM raider_completed_expedition_parts WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
       await client.query('COMMIT');
 
       res.json({ 
@@ -295,6 +434,195 @@ router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
   } catch (error) {
     console.error('Error completing expedition:', error);
     res.status(500).json({ error: 'Failed to complete expedition' });
+  }
+});
+
+// Get all quests (public data with URLs)
+router.get('/quests', async (req, res) => {
+  try {
+    const quests = await pool.query(`
+      SELECT q.id, q.name, q.locations, q.url,
+             array_agg(qo.objective_text ORDER BY qo.order_index) FILTER (WHERE qo.objective_text IS NOT NULL) as objectives,
+             array_agg(qr.reward_text ORDER BY qr.order_index) FILTER (WHERE qr.reward_text IS NOT NULL) as rewards
+      FROM quests q
+      LEFT JOIN quest_objectives qo ON q.id = qo.quest_id
+      LEFT JOIN quest_rewards qr ON q.id = qr.quest_id
+      GROUP BY q.id, q.name, q.locations, q.url
+      ORDER BY q.id
+    `);
+    
+    res.json({ quests: quests.rows });
+  } catch (error) {
+    console.error('Error fetching quests:', error);
+    res.status(500).json({ error: 'Failed to fetch quests' });
+  }
+});
+
+// Get all workbenches
+router.get('/workbenches', async (req, res) => {
+  try {
+    const workbenches = await pool.query(`
+      SELECT id, name, category, level, display_order
+      FROM workbenches
+      ORDER BY display_order, level
+    `);
+    
+    res.json({ workbenches: workbenches.rows });
+  } catch (error) {
+    console.error('Error fetching workbenches:', error);
+    res.status(500).json({ error: 'Failed to fetch workbenches' });
+  }
+});
+
+// Get raider profile by username (public search)
+router.get('/search', async (req, res) => {
+  try {
+    const { raiderName } = req.query;
+    
+    if (!raiderName) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    // Find raider profile by username
+    const profile = await pool.query(
+      `SELECT rp.id, rp.expedition_level, rp.created_at, u.username
+       FROM raider_profiles rp
+       JOIN users u ON rp.user_id = u.id
+       WHERE LOWER(u.username) = LOWER($1) AND rp.is_active = true
+       LIMIT 1`,
+      [raiderName]
+    );
+    
+    if (profile.rows.length === 0) {
+      return res.status(404).json({ error: 'Raider not found' });
+    }
+    
+    const raiderProfile = profile.rows[0];
+    const profileId = raiderProfile.id;
+    
+    // Get completed quests
+    const completedQuests = await pool.query(
+      'SELECT quest_id FROM raider_completed_quests WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    
+    // Get owned blueprints
+    const ownedBlueprints = await pool.query(
+      `SELECT b.name FROM raider_owned_blueprints rob
+       JOIN blueprints b ON rob.blueprint_id = b.id
+       WHERE rob.raider_profile_id = $1`,
+      [profileId]
+    );
+    
+    // Get completed workbenches
+    const completedWorkbenches = await pool.query(
+      `SELECT w.name FROM raider_completed_workbenches rcw
+       JOIN workbenches w ON rcw.workbench_id = w.id
+       WHERE rcw.raider_profile_id = $1`,
+      [profileId]
+    );
+    
+    // Get completed expedition parts
+    const completedExpeditionParts = await pool.query(
+      `SELECT ep.name FROM raider_completed_expedition_parts rcep
+       JOIN expedition_parts ep ON rcep.expedition_part_id = ep.id
+       WHERE rcep.raider_profile_id = $1`,
+      [profileId]
+    );
+    
+    // Check if current user has this raider favorited
+    const isFavorited = await pool.query(
+      'SELECT id FROM favorite_raiders WHERE user_id = $1 AND raider_profile_id = $2',
+      [req.user.userId, profileId]
+    );
+    
+    res.json({
+      raider: {
+        profileId: raiderProfile.id,
+        username: raiderProfile.username,
+        expeditionLevel: raiderProfile.expedition_level,
+        createdAt: raiderProfile.created_at,
+        questsCompleted: completedQuests.rows.map(r => r.quest_id),
+        blueprintsOwned: ownedBlueprints.rows.map(r => r.name),
+        workbenchesCompleted: completedWorkbenches.rows.map(r => r.name),
+        expeditionPartsCompleted: completedExpeditionParts.rows.map(r => r.name),
+        isFavorited: isFavorited.rows.length > 0,
+        stats: {
+          totalQuestsCompleted: completedQuests.rows.length,
+          totalBlueprintsOwned: ownedBlueprints.rows.length,
+          totalWorkbenchesCompleted: completedWorkbenches.rows.length,
+          totalExpeditionPartsCompleted: completedExpeditionParts.rows.length
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error searching for raider:', error);
+    res.status(500).json({ error: 'Failed to search for raider' });
+  }
+});
+
+// Get user's favorite raiders
+router.get('/favorites', async (req, res) => {
+  try {
+    const favorites = await pool.query(
+      `SELECT rp.id, rp.expedition_level, u.username, fr.created_at as favorited_at
+       FROM favorite_raiders fr
+       JOIN raider_profiles rp ON fr.raider_profile_id = rp.id
+       JOIN users u ON rp.user_id = u.id
+       WHERE fr.user_id = $1 AND rp.is_active = true
+       ORDER BY fr.created_at DESC`,
+      [req.user.userId]
+    );
+    
+    res.json({ favorites: favorites.rows });
+  } catch (error) {
+    console.error('Error fetching favorites:', error);
+    res.status(500).json({ error: 'Failed to fetch favorites' });
+  }
+});
+
+// Add raider to favorites
+router.post('/favorites/:raiderProfileId', async (req, res) => {
+  try {
+    const { raiderProfileId } = req.params;
+    
+    // Verify raider profile exists
+    const profile = await pool.query(
+      'SELECT id FROM raider_profiles WHERE id = $1 AND is_active = true',
+      [raiderProfileId]
+    );
+    
+    if (profile.rows.length === 0) {
+      return res.status(404).json({ error: 'Raider profile not found' });
+    }
+    
+    // Add to favorites (will ignore if already exists due to UNIQUE constraint)
+    await pool.query(
+      'INSERT INTO favorite_raiders (user_id, raider_profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.user.userId, raiderProfileId]
+    );
+    
+    res.json({ message: 'Raider added to favorites' });
+  } catch (error) {
+    console.error('Error adding favorite:', error);
+    res.status(500).json({ error: 'Failed to add favorite' });
+  }
+});
+
+// Remove raider from favorites
+router.delete('/favorites/:raiderProfileId', async (req, res) => {
+  try {
+    const { raiderProfileId } = req.params;
+    
+    await pool.query(
+      'DELETE FROM favorite_raiders WHERE user_id = $1 AND raider_profile_id = $2',
+      [req.user.userId, raiderProfileId]
+    );
+    
+    res.json({ message: 'Raider removed from favorites' });
+  } catch (error) {
+    console.error('Error removing favorite:', error);
+    res.status(500).json({ error: 'Failed to remove favorite' });
   }
 });
 

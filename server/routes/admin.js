@@ -39,13 +39,13 @@ router.use(requireAdmin);
 router.get('/quests', async (req, res) => {
   try {
     const quests = await pool.query(`
-      SELECT q.id, q.name, q.locations,
-             array_agg(DISTINCT qo.objective_text ORDER BY qo.objective_text) FILTER (WHERE qo.objective_text IS NOT NULL) as objectives,
-             array_agg(DISTINCT qr.reward_text ORDER BY qr.reward_text) FILTER (WHERE qr.reward_text IS NOT NULL) as rewards
+      SELECT q.id, q.name, q.locations, q.url,
+             array_agg(qo.objective_text ORDER BY qo.order_index) FILTER (WHERE qo.objective_text IS NOT NULL) as objectives,
+             array_agg(qr.reward_text ORDER BY qr.order_index) FILTER (WHERE qr.reward_text IS NOT NULL) as rewards
       FROM quests q
       LEFT JOIN quest_objectives qo ON q.id = qo.quest_id
       LEFT JOIN quest_rewards qr ON q.id = qr.quest_id
-      GROUP BY q.id, q.name, q.locations
+      GROUP BY q.id, q.name, q.locations, q.url
       ORDER BY q.id
     `);
     
@@ -58,7 +58,7 @@ router.get('/quests', async (req, res) => {
 
 // Create new quest
 router.post('/quests', async (req, res) => {
-  const { id, name, locations, objectives, rewards } = req.body;
+  const { id, name, locations, url, objectives, rewards } = req.body;
   
   try {
     // Validation
@@ -72,8 +72,8 @@ router.post('/quests', async (req, res) => {
       
       // Insert quest
       await client.query(
-        'INSERT INTO quests (id, name, locations) VALUES ($1, $2, $3)',
-        [id, name, locations || '']
+        'INSERT INTO quests (id, name, locations, url) VALUES ($1, $2, $3, $4)',
+        [id, name, locations || '', url || null]
       );
       
       // Insert objectives
@@ -123,9 +123,9 @@ router.post('/quests', async (req, res) => {
 // Update existing quest
 router.put('/quests/:id', async (req, res) => {
   const questId = req.params.id;
-  const { name, locations, objectives, rewards } = req.body;
+  const { name, locations, url, objectives, rewards } = req.body;
   
-  console.log('Updating quest:', questId, { name, locations, objectives, rewards });
+  console.log('Updating quest:', questId, { name, locations, url, objectives, rewards });
   
   try {
     const client = await pool.connect();
@@ -134,8 +134,8 @@ router.put('/quests/:id', async (req, res) => {
       
       // Update quest
       await client.query(
-        'UPDATE quests SET name = $1, locations = $2 WHERE id = $3',
-        [name, locations, questId]
+        'UPDATE quests SET name = $1, locations = $2, url = $3 WHERE id = $4',
+        [name, locations, url || null, questId]
       );
       console.log('Quest updated');
       
@@ -283,6 +283,116 @@ router.delete('/blueprints/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting blueprint:', error);
     res.status(500).json({ error: 'Failed to delete blueprint' });
+  }
+});
+
+// ===== USER MANAGEMENT =====
+
+// Get all users (exclude passwords)
+router.get('/users', async (req, res) => {
+  try {
+    const users = await pool.query(
+      'SELECT id, email, username, role, created_at, last_login, is_active FROM users ORDER BY id'
+    );
+    res.json({ users: users.rows });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+// Create new user
+router.post('/users', async (req, res) => {
+  const { email, username, password, role = 'user' } = req.body;
+  
+  try {
+    // Validation
+    if (!email || !username || !password) {
+      return res.status(400).json({ error: 'Email, username, and password are required' });
+    }
+    
+    if (username.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+    
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    
+    // Hash password
+    const bcrypt = await import('bcrypt');
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    const result = await pool.query(
+      'INSERT INTO users (email, username, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [email, username, hashedPassword, role]
+    );
+    
+    res.status(201).json({ message: 'User created successfully', userId: result.rows[0].id });
+  } catch (error) {
+    console.error('Error creating user:', error);
+    if (error.code === '23505') {
+      res.status(409).json({ error: 'Email or username already exists' });
+    } else {
+      res.status(500).json({ error: 'Failed to create user' });
+    }
+  }
+});
+
+// Delete user
+router.delete('/users/:id', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  
+  try {
+    // Prevent deleting yourself
+    if (userId === req.user.userId) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+    
+    // Delete user (cascades will handle raider profiles and related data)
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Update user role
+router.put('/users/:id/role', async (req, res) => {
+  const userId = parseInt(req.params.id);
+  const { role } = req.body;
+  
+  try {
+    // Validation
+    if (!role || !['user', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role. Must be "user" or "admin"' });
+    }
+    
+    // Prevent changing your own role
+    if (userId === req.user.userId) {
+      return res.status(400).json({ error: 'Cannot change your own role' });
+    }
+    
+    // Update role
+    const result = await pool.query(
+      'UPDATE users SET role = $1 WHERE id = $2 RETURNING id',
+      [role, userId]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ message: 'User role updated successfully' });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ error: 'Failed to update user role' });
   }
 });
 

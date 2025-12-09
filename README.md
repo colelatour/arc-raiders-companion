@@ -2,19 +2,77 @@
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+# ARC Raiders Companion
 
-This contains everything you need to run your app locally.
+A comprehensive companion app for ARC Raiders players to track quests, blueprints, crafting materials, and more.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1vH7SdxbJ6LfDOPNjxIi7sMxtEXV5aPA7
+## Features
+
+- 🎯 **Quest Tracking** - Track completed quests and objectives
+- 📜 **Blueprint Manager** - Manage your blueprint collection
+- 🔨 **Workbench** - Find materials needed for crafting stations
+- ♻️ **Safe Items** - Know what's safe to recycle or sell
+- 👤 **User Profiles** - Multiple raider profiles per account
+- 🔐 **Role-Based Access** - Admin and user roles
+- 📊 **Expedition System** - Track progress across wipes
+
+## Project Structure
+
+```
+arc-raiders-companion/
+├── src/
+│   ├── components/      # React components
+│   ├── contexts/        # React contexts (Auth, etc.)
+│   ├── hooks/          # Custom React hooks
+│   ├── types/          # TypeScript type definitions
+│   └── utils/          # Utilities (API, constants)
+├── server/             # Backend Express server
+├── scripts/            # Database and utility scripts
+├── docs/              # Documentation
+└── dist/              # Production build
+```
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js, PostgreSQL
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+   ```bash
+   npm install
+   cd server && npm install
+   ```
+
+2. Set up environment variables (see `docs/SETUP.md`)
+
+3. Initialize the database:
+   ```bash
+   psql -U postgres -f scripts/database-schema.sql
+   ```
+
+4. Run the app:
+   ```bash
+   npm run dev           # Frontend (port 3002)
+   cd server && npm start # Backend (port 3001)
+   ```
+
+Or use the quick start script:
+```bash
+./scripts/quickstart.sh
+```
+
+## Documentation
+
+- [Setup Guide](docs/SETUP.md) - Detailed setup instructions
+- [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - Feature overview
+- [Checklist](docs/CHECKLIST.md) - Development progress
+
+## Tech Stack
+
+- **Frontend:** React, TypeScript, Vite, TailwindCSS
+- **Backend:** Node.js, Express
+- **Database:** PostgreSQL
+- **Auth:** JWT, bcrypt
+
+## License
+
+This project is not affiliated with Embark Studios. Game data sourced from community efforts.

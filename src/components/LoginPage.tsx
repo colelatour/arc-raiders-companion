@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Terminal, AlertTriangle, Loader } from 'lucide-react';
-import { useAuth } from './AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
