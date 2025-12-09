@@ -38,11 +38,18 @@ router.post('/profiles', async (req, res) => {
       return res.status(409).json({ error: 'Profile already exists for this user' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO raider_profiles (user_id, expedition_level) 
-       VALUES ($1, 0) 
-       RETURNING id, expedition_level, created_at`,
+    // Get username for raider_name
+    const userResult = await pool.query(
+      'SELECT username FROM users WHERE id = $1',
       [req.user.userId]
+    );
+    const username = userResult.rows[0].username;
+
+    const result = await pool.query(
+      `INSERT INTO raider_profiles (user_id, raider_name, expedition_level) 
+       VALUES ($1, $2, 0) 
+       RETURNING id, expedition_level, created_at`,
+      [req.user.userId, username]
     );
 
     res.status(201).json({ profile: result.rows[0] });
