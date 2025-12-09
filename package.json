@@ -5,10 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "cd server && npm run dev",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev\" --names \"backend,frontend\" --prefix-colors \"blue,green\"",
+    "start": "npm run dev:all",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "lucide-react": "^0.556.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
@@ -16,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^9.2.1",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
   }
