@@ -46,9 +46,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (email: string, username: string, password: string) => {
-    const response = await auth.register(email, username, password);
-    localStorage.setItem('arc_auth_token', response.data.token);
-    setUser(response.data.user);
+    // Just register without auto-login
+    await auth.register(email, username, password);
   };
 
   const logout = () => {
