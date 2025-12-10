@@ -1,6 +1,7 @@
 import express from 'express';
 import pool from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import bcrypt from 'bcrypt';
 
 const router = express.Router();
 
@@ -374,6 +375,71 @@ router.post('/profiles/:profileId/expedition-parts/:partName', async (req, res) 
   }
 });
 
+// Get completed expedition items (individual materials)
+router.get('/profiles/:profileId/expedition-items', async (req, res) => {
+  const { profileId } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT part_name, item_name 
+       FROM raider_completed_expedition_items
+       WHERE raider_profile_id = $1 
+       AND raider_profile_id IN (
+         SELECT id FROM raider_profiles WHERE user_id = $2
+       )`,
+      [profileId, req.user.userId]
+    );
+
+    res.json({ completedExpeditionItems: result.rows });
+  } catch (error) {
+    console.error('Error fetching expedition items:', error);
+    res.status(500).json({ error: 'Failed to fetch expedition items' });
+  }
+});
+
+// Toggle expedition item completion (individual material)
+router.post('/profiles/:profileId/expedition-items/:partName/:itemName', async (req, res) => {
+  const { profileId, partName, itemName} = req.params;
+
+  try {
+    // Verify profile ownership
+    const profile = await pool.query(
+      'SELECT id FROM raider_profiles WHERE id = $1 AND user_id = $2',
+      [profileId, req.user.userId]
+    );
+
+    if (profile.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    // Check if already completed
+    const existing = await pool.query(
+      `SELECT id FROM raider_completed_expedition_items 
+       WHERE raider_profile_id = $1 AND part_name = $2 AND item_name = $3`,
+      [profileId, partName, itemName]
+    );
+
+    if (existing.rows.length > 0) {
+      // Remove completion
+      await pool.query(
+        'DELETE FROM raider_completed_expedition_items WHERE raider_profile_id = $1 AND part_name = $2 AND item_name = $3',
+        [profileId, partName, itemName]
+      );
+      res.json({ completed: false });
+    } else {
+      // Add completion
+      await pool.query(
+        'INSERT INTO raider_completed_expedition_items (raider_profile_id, part_name, item_name) VALUES ($1, $2, $3)',
+        [profileId, partName, itemName]
+      );
+      res.json({ completed: true });
+    }
+  } catch (error) {
+    console.error('Error toggling expedition item:', error);
+    res.status(500).json({ error: 'Failed to toggle expedition item' });
+  }
+});
+
 // Increment expedition level (wipe progress)
 router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
   const { profileId } = req.params;
@@ -393,6 +459,67 @@ router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
       if (profile.rows.length === 0) {
         await client.query('ROLLBACK');
         return res.status(404).json({ error: 'Profile not found' });
+      }
+
+      const currentLevel = profile.rows[0].expedition_level;
+      const nextLevel = currentLevel + 1;
+
+      // Get all requirements for current expedition level
+      const currentRequirements = await client.query(
+        'SELECT * FROM expedition_requirements WHERE expedition_level = $1',
+        [currentLevel]
+      );
+
+      if (currentRequirements.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          error: 'NO_REQUIREMENTS',
+          message: `Current expedition has no requirements configured.`
+        });
+      }
+
+      // Get all completed items for this profile
+      const completedItems = await client.query(
+        'SELECT part_name, item_name FROM raider_completed_expedition_items WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Check if ALL requirements are completed
+      const totalRequirements = currentRequirements.rows.length;
+      const completedItemsSet = new Set(
+        completedItems.rows.map(item => `${item.part_name}|${item.item_name}`)
+      );
+
+      const allCompleted = currentRequirements.rows.every(req => {
+        const partName = `Part ${req.part_number}`;
+        const key = `${partName}|${req.item_name}`;
+        return completedItemsSet.has(key);
+      });
+
+      if (!allCompleted) {
+        await client.query('ROLLBACK');
+        const completedCount = completedItems.rows.length;
+        return res.status(400).json({ 
+          error: 'EXPEDITION_INCOMPLETE',
+          message: `You must complete all expedition requirements before progressing!`,
+          completedCount: completedCount,
+          totalCount: totalRequirements
+        });
+      }
+
+      // Check if next expedition level has requirements
+      const nextExpeditionCheck = await client.query(
+        'SELECT COUNT(*) FROM expedition_requirements WHERE expedition_level = $1',
+        [nextLevel]
+      );
+
+      if (parseInt(nextExpeditionCheck.rows[0].count) === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ 
+          error: 'EXPEDITION_NOT_AVAILABLE',
+          message: `Expedition ${nextLevel} has not been released yet!`,
+          currentLevel: currentLevel
+        });
       }
 
       // Increment expedition level
@@ -425,11 +552,17 @@ router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
         [profileId]
       );
 
+      // Wipe expedition items progress
+      await client.query(
+        'DELETE FROM raider_completed_expedition_items WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
       await client.query('COMMIT');
 
       res.json({ 
         message: 'Expedition completed successfully',
-        newExpeditionLevel: profile.rows[0].expedition_level + 1
+        newExpeditionLevel: nextLevel
       });
 
     } catch (error) {
@@ -548,6 +681,21 @@ router.get('/search', async (req, res) => {
       [profileId]
     );
     
+    // Get completed expedition items (individual materials)
+    const completedExpeditionItems = await pool.query(
+      `SELECT part_name, item_name FROM raider_completed_expedition_items
+       WHERE raider_profile_id = $1`,
+      [profileId]
+    );
+    
+    // Get expedition requirements for this raider's expedition level
+    const expeditionRequirements = await pool.query(
+      `SELECT * FROM expedition_requirements
+       WHERE expedition_level = $1
+       ORDER BY part_number, display_order`,
+      [raiderProfile.expedition_level]
+    );
+    
     // Check if current user has this raider favorited
     const isFavorited = await pool.query(
       'SELECT id FROM favorite_raiders WHERE user_id = $1 AND raider_profile_id = $2',
@@ -564,6 +712,8 @@ router.get('/search', async (req, res) => {
         blueprintsOwned: ownedBlueprints.rows.map(r => r.name),
         workbenchesCompleted: completedWorkbenches.rows.map(r => r.name),
         expeditionPartsCompleted: completedExpeditionParts.rows.map(r => r.name),
+        expeditionItemsCompleted: completedExpeditionItems.rows,
+        expeditionRequirements: expeditionRequirements.rows,
         isFavorited: isFavorited.rows.length > 0,
         stats: {
           totalQuestsCompleted: completedQuests.rows.length,
@@ -641,6 +791,333 @@ router.delete('/favorites/:raiderProfileId', async (req, res) => {
   } catch (error) {
     console.error('Error removing favorite:', error);
     res.status(500).json({ error: 'Failed to remove favorite' });
+  }
+});
+
+// ==================== USER SETTINGS ====================
+
+// Update username
+router.put('/settings/username', async (req, res) => {
+  const { newUsername } = req.body;
+
+  try {
+    if (!newUsername || newUsername.trim().length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters' });
+    }
+
+    // Check if username is already taken
+    const existingUser = await pool.query(
+      'SELECT id FROM users WHERE username = $1 AND id != $2',
+      [newUsername.trim(), req.user.userId]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(409).json({ error: 'Username already taken' });
+    }
+
+    // Update username in users table
+    await pool.query(
+      'UPDATE users SET username = $1 WHERE id = $2',
+      [newUsername.trim(), req.user.userId]
+    );
+
+    // Update raider_name in raider_profiles table
+    await pool.query(
+      'UPDATE raider_profiles SET raider_name = $1 WHERE user_id = $2',
+      [newUsername.trim(), req.user.userId]
+    );
+
+    res.json({ message: 'Username updated successfully', username: newUsername.trim() });
+  } catch (error) {
+    console.error('Error updating username:', error);
+    res.status(500).json({ error: 'Failed to update username' });
+  }
+});
+
+// Update password
+router.put('/settings/password', async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  console.log('🔐 Password update request received from user:', req.user.userId);
+
+  try {
+    if (!currentPassword || !newPassword) {
+      console.log('❌ Missing password fields');
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      console.log('❌ New password too short');
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Get user's current password hash
+    const userResult = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      console.log('❌ User not found:', req.user.userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    console.log('✅ User found, verifying current password...');
+
+    // Verify current password
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password_hash);
+
+    if (!isValidPassword) {
+      console.log('❌ Current password incorrect');
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    console.log('✅ Current password verified, hashing new password...');
+
+    // Hash new password
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    console.log('✅ New password hashed, updating database...');
+
+    // Update password
+    await pool.query(
+      'UPDATE users SET password_hash = $1 WHERE id = $2',
+      [newPasswordHash, req.user.userId]
+    );
+
+    console.log('✅ Password updated successfully for user:', req.user.userId);
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('❌ Error updating password:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to update password',
+      details: error.message 
+    });
+  }
+});
+
+// Reset account (wipe all progress, back to expedition 0)
+router.post('/settings/reset', async (req, res) => {
+  console.log('🔄 Reset account request received from user:', req.user.userId);
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    console.log('Transaction started');
+
+    // Get user's profile
+    const profileResult = await client.query(
+      'SELECT id FROM raider_profiles WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    if (profileResult.rows.length === 0) {
+      console.log('❌ Profile not found for user:', req.user.userId);
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const profileId = profileResult.rows[0].id;
+    console.log('Found profile ID:', profileId);
+
+    // Delete all completed quests
+    const questsDeleted = await client.query(
+      'DELETE FROM raider_completed_quests WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    console.log('Deleted quests:', questsDeleted.rowCount);
+
+    // Delete all owned blueprints
+    const blueprintsDeleted = await client.query(
+      'DELETE FROM raider_owned_blueprints WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    console.log('Deleted blueprints:', blueprintsDeleted.rowCount);
+
+    // Delete all completed workbenches
+    const workbenchesDeleted = await client.query(
+      'DELETE FROM raider_completed_workbenches WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    console.log('Deleted workbenches:', workbenchesDeleted.rowCount);
+
+    // Delete all completed expedition parts
+    const partsDeleted = await client.query(
+      'DELETE FROM raider_completed_expedition_parts WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    console.log('Deleted expedition parts:', partsDeleted.rowCount);
+
+    // Delete all completed expedition items (individual materials)
+    const itemsDeleted = await client.query(
+      'DELETE FROM raider_completed_expedition_items WHERE raider_profile_id = $1',
+      [profileId]
+    );
+    console.log('Deleted expedition items:', itemsDeleted.rowCount);
+
+    // Reset expedition level to 1
+    await client.query(
+      'UPDATE raider_profiles SET expedition_level = 1 WHERE id = $1',
+      [profileId]
+    );
+    console.log('Reset expedition level to 1 in raider_profiles');
+
+    await client.query('COMMIT');
+    console.log('✅ Account reset successful for user:', req.user.userId);
+
+    res.json({ message: 'Account reset successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('❌ Error resetting account:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Failed to reset account',
+      details: error.message 
+    });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete account (delete user and all associated data)
+router.delete('/settings/account', async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // Get user's profile
+    const profileResult = await client.query(
+      'SELECT id FROM raider_profiles WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    if (profileResult.rows.length > 0) {
+      const profileId = profileResult.rows[0].id;
+
+      // Delete all completed quests
+      await client.query(
+        'DELETE FROM raider_completed_quests WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Delete all owned blueprints
+      await client.query(
+        'DELETE FROM raider_owned_blueprints WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Delete all completed workbenches
+      await client.query(
+        'DELETE FROM raider_completed_workbenches WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Delete all completed expedition parts
+      await client.query(
+        'DELETE FROM raider_completed_expedition_parts WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Delete all completed expedition items (individual materials)
+      await client.query(
+        'DELETE FROM raider_completed_expedition_items WHERE raider_profile_id = $1',
+        [profileId]
+      );
+
+      // Delete raider profile
+      await client.query(
+        'DELETE FROM raider_profiles WHERE id = $1',
+        [profileId]
+      );
+    }
+
+    // Delete favorite raiders
+    await client.query(
+      'DELETE FROM favorite_raiders WHERE user_id = $1',
+      [req.user.userId]
+    );
+
+    // Delete user
+    await client.query(
+      'DELETE FROM users WHERE id = $1',
+      [req.user.userId]
+    );
+
+    await client.query('COMMIT');
+
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting account:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
+  } finally {
+    client.release();
+  }
+});
+
+// Get expedition requirements for current user's expedition level
+router.get('/expedition-requirements', async (req, res) => {
+  try {
+    // Get user's current expedition level
+    const profileResult = await pool.query(
+      'SELECT expedition_level FROM raider_profiles WHERE user_id = $1 AND is_active = true LIMIT 1',
+      [req.user.userId]
+    );
+    
+    if (profileResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+    
+    const expeditionLevel = profileResult.rows[0].expedition_level;
+    
+    // Get requirements for this expedition level
+    const result = await pool.query(
+      `SELECT * FROM expedition_requirements 
+       WHERE expedition_level = $1 
+       ORDER BY part_number, display_order`,
+      [expeditionLevel]
+    );
+    
+    res.json({ 
+      expeditionLevel,
+      requirements: result.rows 
+    });
+  } catch (error) {
+    console.error('Error fetching expedition requirements:', error);
+    res.status(500).json({ error: 'Failed to fetch expedition requirements' });
+  }
+});
+
+// Get a random raider tip
+router.get('/tips/random', async (req, res) => {
+  try {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const tipsPath = path.join(__dirname, '..', 'raider-tips.txt');
+    
+    const fileContent = await fs.readFile(tipsPath, 'utf-8');
+    const tips = fileContent.split('\n').filter(line => line.trim() !== '');
+    
+    if (tips.length === 0) {
+      return res.json({ tip: 'Stay alert, Raider!' });
+    }
+    
+    const randomTip = tips[Math.floor(Math.random() * tips.length)];
+    
+    res.json({ tip: randomTip });
+  } catch (error) {
+    console.error('Error fetching random tip:', error);
+    res.json({ tip: 'Master the battlefield, Raider!' });
   }
 });
 

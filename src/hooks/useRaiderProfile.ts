@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { raider } from '../utils/api';
 
+interface ExpeditionItem {
+  part_name: string;
+  item_name: string;
+}
+
 interface ProfileData {
   profileId: number;
   expeditionLevel: number;
@@ -8,6 +13,7 @@ interface ProfileData {
   ownedBlueprints: string[];
   completedWorkbenches: string[];
   completedExpeditionParts: string[];
+  completedExpeditionItems: ExpeditionItem[];
   questsCount: number;
   blueprintsCount: number;
   workbenchesCount: number;
@@ -38,6 +44,7 @@ export const useRaiderProfile = () => {
           ownedBlueprints: [],
           completedWorkbenches: [],
           completedExpeditionParts: [],
+          completedExpeditionItems: [],
           questsCount: 0,
           blueprintsCount: 0,
           workbenchesCount: 0,
@@ -48,11 +55,12 @@ export const useRaiderProfile = () => {
         const profile = profiles[0];
         
         // Get quests and blueprints
-        const [questsResponse, blueprintsResponse, workbenchesResponse, expeditionPartsResponse, statsResponse] = await Promise.all([
+        const [questsResponse, blueprintsResponse, workbenchesResponse, expeditionPartsResponse, expeditionItemsResponse, statsResponse] = await Promise.all([
           raider.getCompletedQuests(profile.id),
           raider.getOwnedBlueprints(profile.id),
           raider.getCompletedWorkbenches(profile.id),
           raider.getCompletedExpeditionParts(profile.id),
+          raider.getCompletedExpeditionItems(profile.id),
           raider.getStats(profile.id)
         ]);
         
@@ -63,6 +71,7 @@ export const useRaiderProfile = () => {
           ownedBlueprints: blueprintsResponse.data.ownedBlueprints,
           completedWorkbenches: workbenchesResponse.data.completedWorkbenches,
           completedExpeditionParts: expeditionPartsResponse.data.completedExpeditionParts,
+          completedExpeditionItems: expeditionItemsResponse.data.completedExpeditionItems,
           questsCount: questsResponse.data.completedQuests.length,
           blueprintsCount: blueprintsResponse.data.ownedBlueprints.length,
           workbenchesCount: workbenchesResponse.data.completedWorkbenches.length,
@@ -173,14 +182,69 @@ export const useRaiderProfile = () => {
     }
   };
 
+  const toggleExpeditionItem = async (partName: string, itemName: string) => {
+    if (!profileData) return;
+    
+    console.log('🔄 Toggling expedition item:', partName, '/', itemName, 'Profile:', profileData.profileId);
+    
+    try {
+      // Check if item is currently completed
+      const wasCompleted = profileData.completedExpeditionItems.some(
+        item => item.part_name === partName && item.item_name === itemName
+      );
+
+      console.log('📊 Current state:', wasCompleted ? '✅ Completed - Will uncomplete' : '❌ Not completed - Will complete');
+
+      // Optimistically update UI
+      const newCompletedItems = wasCompleted
+        ? profileData.completedExpeditionItems.filter(
+            item => !(item.part_name === partName && item.item_name === itemName)
+          )
+        : [...profileData.completedExpeditionItems, { part_name: partName, item_name: itemName }];
+
+      setProfileData({
+        ...profileData,
+        completedExpeditionItems: newCompletedItems
+      });
+      
+      // Send to backend
+      const response = await raider.toggleExpeditionItem(profileData.profileId, partName, itemName);
+      console.log('✅ Saved to database:', response.data.completed ? 'Marked complete' : 'Unmarked');
+    } catch (error) {
+      console.error('❌ Failed to toggle expedition item:', error);
+      // Reload on error to restore correct state
+      await loadProfile();
+    }
+  };
+
   const completeExpedition = async () => {
     if (!profileData) return;
     
     try {
-      await raider.completeExpedition(profileData.profileId);
+      const response = await raider.completeExpedition(profileData.profileId);
+      console.log('✅ Expedition API response:', response.data);
       await loadProfile(); // Reload data
-    } catch (error) {
+      return { 
+        success: true, 
+        newExpeditionLevel: response.data.newExpeditionLevel 
+      };
+    } catch (error: any) {
       console.error('Failed to complete expedition:', error);
+      if (error.response?.data?.error === 'EXPEDITION_NOT_AVAILABLE') {
+        return { 
+          success: false, 
+          error: 'EXPEDITION_NOT_AVAILABLE',
+          message: error.response.data.message 
+        };
+      }
+      if (error.response?.data?.error === 'EXPEDITION_INCOMPLETE') {
+        return { 
+          success: false, 
+          error: 'EXPEDITION_INCOMPLETE',
+          message: error.response.data.message 
+        };
+      }
+      return { success: false, error: 'UNKNOWN_ERROR' };
     }
   };
 
@@ -191,6 +255,7 @@ export const useRaiderProfile = () => {
     toggleBlueprint,
     toggleWorkbench,
     toggleExpeditionPart,
+    toggleExpeditionItem,
     completeExpedition,
     refresh: loadProfile
   };

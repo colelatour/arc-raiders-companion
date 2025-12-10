@@ -28,7 +28,8 @@ import {
   Users,
   Star,
   Wrench,
-  Package
+  Package,
+  UserCog
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
 import { useRaiderProfile } from './hooks/useRaiderProfile';
@@ -36,8 +37,8 @@ import { admin, raider } from './utils/api';
 import { QUESTS, BLUEPRINTS, CRAFTING_ITEMS, SAFE_TO_RECYCLE, SAFE_TO_SELL } from './utils/constants';
 import { ViewState, SafeItem, CraftingItem } from './types/types';
 
-// Add admin to ViewState
-type AppViewState = ViewState | 'admin';
+// Add admin and settings to ViewState
+type AppViewState = ViewState | 'admin' | 'settings';
 
 // --- Components ---
 
@@ -82,38 +83,99 @@ const HomeView = ({
   onWipe,
   profileData
 }: { 
-  onWipe: () => void,
+  onWipe: () => Promise<any>,
   profileData: any
 }) => {
   const [showWipeModal, setShowWipeModal] = useState(false);
+  const [showExpeditionUnavailableModal, setShowExpeditionUnavailableModal] = useState(false);
+  const [showExpeditionIncompleteModal, setShowExpeditionIncompleteModal] = useState(false);
+  const [showCongratulationsModal, setShowCongratulationsModal] = useState(false);
+  const [newExpeditionLevel, setNewExpeditionLevel] = useState(0);
+  const [expeditionUnavailableMessage, setExpeditionUnavailableMessage] = useState('');
+  const [expeditionIncompleteMessage, setExpeditionIncompleteMessage] = useState('');
   const [totalQuestsCount, setTotalQuestsCount] = useState(QUESTS.length);
   const [totalBlueprintsCount, setTotalBlueprintsCount] = useState(BLUEPRINTS.length);
+  const [totalExpeditionItems, setTotalExpeditionItems] = useState(20);
+  const [completedExpeditionItems, setCompletedExpeditionItems] = useState(0);
+  const [raiderTip, setRaiderTip] = useState('');
+
+  // Check for expedition completion on mount
+  useEffect(() => {
+    const justCompleted = sessionStorage.getItem('expeditionJustCompleted');
+    const completedLevel = sessionStorage.getItem('completedExpeditionLevel');
+    
+    if (justCompleted === 'true' && completedLevel) {
+      setNewExpeditionLevel(parseInt(completedLevel));
+      setShowCongratulationsModal(true);
+      // Clear the flags
+      sessionStorage.removeItem('expeditionJustCompleted');
+      sessionStorage.removeItem('completedExpeditionLevel');
+    }
+    
+    // Load random tip
+    const loadTip = async () => {
+      try {
+        const response = await raider.getRandomTip();
+        setRaiderTip(response.data.tip);
+      } catch (error) {
+        console.error('Failed to load tip:', error);
+        setRaiderTip('Stay alert, Raider!');
+      }
+    };
+    
+    loadTip();
+  }, []);
 
   // Load actual counts from database
   useEffect(() => {
     const loadCounts = async () => {
       try {
-        const [questsRes, blueprintsRes] = await Promise.all([
+        const [questsRes, blueprintsRes, expeditionReqRes] = await Promise.all([
           raider.getAllQuests(),
-          admin.getAllBlueprints().catch(() => ({ data: { blueprints: BLUEPRINTS } }))
+          admin.getAllBlueprints().catch(() => ({ data: { blueprints: BLUEPRINTS } })),
+          raider.getExpeditionRequirements().catch(() => ({ data: { requirements: [] } }))
         ]);
         
         setTotalQuestsCount(questsRes.data.quests?.length || QUESTS.length);
         setTotalBlueprintsCount(blueprintsRes.data.blueprints?.length || BLUEPRINTS.length);
+        setTotalExpeditionItems(expeditionReqRes.data.requirements?.length || 20);
+        setCompletedExpeditionItems(profileData?.completedExpeditionItems?.length || 0);
       } catch (error) {
         console.error('Failed to load counts:', error);
         // Use constants as fallback
         setTotalQuestsCount(QUESTS.length);
         setTotalBlueprintsCount(BLUEPRINTS.length);
+        setTotalExpeditionItems(20);
       }
     };
     
     loadCounts();
-  }, []);
+  }, [profileData?.completedExpeditionItems]);
 
   const handleConfirmExpedition = async () => {
-    await onWipe();
+    const result = await onWipe();
+    console.log('📝 Expedition completion result:', result);
     setShowWipeModal(false);
+    
+    if (result && result.success) {
+      // Store completion info in session storage
+      const newLevel = result.newExpeditionLevel || stats.expeditionLevel + 1;
+      console.log('✅ Expedition completed! New level:', newLevel);
+      sessionStorage.setItem('expeditionJustCompleted', 'true');
+      sessionStorage.setItem('completedExpeditionLevel', newLevel.toString());
+      // The page will reload from the hook, and the modal will show on mount
+    } else if (result && !result.success) {
+      console.log('❌ Expedition failed:', result.error);
+      if (result.error === 'EXPEDITION_NOT_AVAILABLE') {
+        setExpeditionUnavailableMessage(result.message || 'Next expedition is not available yet!');
+        setShowExpeditionUnavailableModal(true);
+      } else if (result.error === 'EXPEDITION_INCOMPLETE') {
+        setExpeditionIncompleteMessage(result.message || 'You must complete all expedition requirements!');
+        setShowExpeditionIncompleteModal(true);
+      }
+    } else {
+      console.log('⚠️ Unexpected result format:', result);
+    }
   };
 
   const stats = {
@@ -123,7 +185,8 @@ const HomeView = ({
     totalBlueprints: totalBlueprintsCount,
     expeditionLevel: profileData?.expeditionLevel || 0,
     workbenchesCompleted: Number(profileData?.workbenchesCount) || 0,
-    expeditionPartsCompleted: Number(profileData?.expeditionPartsCount) || 0
+    expeditionItemsCompleted: completedExpeditionItems,
+    totalExpeditionItems: totalExpeditionItems
   };
 
   // Debug logging
@@ -143,14 +206,14 @@ const HomeView = ({
   console.log(`Quests: ${stats.questsCompleted}/${stats.totalQuests} (${stats.questsCompleted === stats.totalQuests ? '✅ COMPLETE' : '❌ INCOMPLETE'})`);
   console.log(`Blueprints: ${stats.blueprintsOwned}/${stats.totalBlueprints} (${stats.blueprintsOwned === stats.totalBlueprints ? '✅ COMPLETE' : '❌ INCOMPLETE'})`);
   console.log(`Workbenches: ${stats.workbenchesCompleted}/19 (${stats.workbenchesCompleted === 19 ? '✅ COMPLETE' : '❌ INCOMPLETE'})`);
-  console.log(`Expedition Parts: ${stats.expeditionPartsCompleted}/5 (${stats.expeditionPartsCompleted === 5 ? '✅ COMPLETE' : '❌ INCOMPLETE'})`);
+  console.log(`Expedition Items: ${stats.expeditionItemsCompleted}/${stats.totalExpeditionItems} (${stats.expeditionItemsCompleted === stats.totalExpeditionItems ? '✅ COMPLETE' : '❌ INCOMPLETE'})`);
 
   // Check if all categories are 100% complete
   const isFullyComplete = 
     stats.questsCompleted === stats.totalQuests &&
     stats.blueprintsOwned === stats.totalBlueprints &&
     stats.workbenchesCompleted === 19 &&
-    stats.expeditionPartsCompleted === 5;
+    stats.expeditionItemsCompleted === stats.totalExpeditionItems;
 
   console.log(`🎯 Fully Complete: ${isFullyComplete ? '✅ YES' : '❌ NO'}`);
 
@@ -188,6 +251,101 @@ const HomeView = ({
                     CONFIRM WIPE
                   </button>
                 </div>
+             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Expedition Unavailable Modal */}
+      {showExpeditionUnavailableModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-yellow-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-yellow-900/50">
+             <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-yellow-900/30 p-4 rounded-full border border-yellow-700 text-yellow-500">
+                  <AlertTriangle size={48} />
+                </div>
+                <h3 className="text-2xl font-black text-white uppercase tracking-wider">Expedition Not Available</h3>
+                <div className="text-gray-300 space-y-2">
+                  <p className="text-lg">{expeditionUnavailableMessage}</p>
+                  <p className="text-sm text-gray-400">Check back later when the next expedition has been released!</p>
+                </div>
+                
+                <button 
+                  onClick={() => setShowExpeditionUnavailableModal(false)}
+                  className="w-full py-3 px-4 rounded bg-yellow-600 text-white hover:bg-yellow-700 font-bold tracking-wide shadow-lg shadow-yellow-900/40 transition-all transform hover:scale-105 mt-4"
+                >
+                  GOT IT
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Expedition Incomplete Modal */}
+      {showExpeditionIncompleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-red-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-red-900/50">
+             <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-red-900/30 p-4 rounded-full border border-red-700 text-red-500">
+                  <AlertTriangle size={48} />
+                </div>
+                <h3 className="text-2xl font-black text-white uppercase tracking-wider">Expedition Incomplete</h3>
+                <div className="text-gray-300 space-y-2">
+                  <p className="text-lg">{expeditionIncompleteMessage}</p>
+                  <p className="text-sm text-gray-400">Complete all expedition items before progressing to the next level.</p>
+                </div>
+                
+                <button 
+                  onClick={() => setShowExpeditionIncompleteModal(false)}
+                  className="w-full py-3 px-4 rounded bg-red-600 text-white hover:bg-red-700 font-bold tracking-wide shadow-lg shadow-red-900/40 transition-all transform hover:scale-105 mt-4"
+                >
+                  GOT IT
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Congratulations Modal */}
+      {(() => {
+        console.log('🔍 Checking congratulations modal:', showCongratulationsModal, 'New level:', newExpeditionLevel);
+        return showCongratulationsModal;
+      })() && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-green-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-green-900/50">
+             <div className="flex flex-col items-center text-center space-y-4">
+                <div className="bg-green-900/30 p-4 rounded-full border border-green-700 text-green-500 animate-pulse">
+                  <Rocket size={48} />
+                </div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-wider">
+                  Congratulations, Raider!
+                </h3>
+                <div className="text-gray-300 space-y-3">
+                  <p className="text-xl font-bold text-green-400">
+                    You've completed Expedition {newExpeditionLevel - 1}!
+                  </p>
+                  <p className="text-lg">
+                    You are now ready for <span className="text-arc-accent font-black">Expedition {newExpeditionLevel}</span>
+                  </p>
+                  <div className="bg-arc-800/50 rounded-lg p-4 border border-green-900/30 mt-4">
+                    <p className="text-sm text-gray-400">
+                      🎯 Your progress has been reset
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      🚀 New challenges await you
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      ⚡ Good luck on your journey!
+                    </p>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setShowCongratulationsModal(false)}
+                  className="w-full py-3 px-4 rounded bg-green-600 text-white hover:bg-green-700 font-bold tracking-wide shadow-lg shadow-green-900/40 transition-all transform hover:scale-105 mt-4"
+                >
+                  LET'S GO!
+                </button>
              </div>
           </div>
         </div>
@@ -258,15 +416,15 @@ const HomeView = ({
               </div>
             </div>
             <div className={`rounded p-4 border transition-all ${
-              (profileData?.expeditionPartsCount || 0) === 5
+              stats.expeditionItemsCompleted === stats.totalExpeditionItems
                 ? 'bg-green-950/30 border-green-900/50' 
                 : 'bg-arc-900/50 border-arc-700'
             }`}>
-              <div className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Expedition Parts</div>
+              <div className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Expedition</div>
               <div className={`text-3xl font-black ${
-                (profileData?.expeditionPartsCount || 0) === 5 ? 'text-green-400' : 'text-white'
+                stats.expeditionItemsCompleted === stats.totalExpeditionItems ? 'text-green-400' : 'text-white'
               }`}>
-                {profileData?.expeditionPartsCount || 0}<span className="text-xl text-gray-600">/5</span>
+                {stats.expeditionItemsCompleted}<span className="text-xl text-gray-600">/{stats.totalExpeditionItems}</span>
               </div>
             </div>
           </div>
@@ -322,27 +480,25 @@ const HomeView = ({
       {/* Tips Section */}
       <div className="lg:col-span-2 bg-arc-800 rounded-lg border border-arc-700 shadow-xl p-6">
         <div className="flex items-center space-x-2 mb-4">
-          <Info size={20} className="text-arc-accent" />
-          <h3 className="text-lg font-bold text-white tracking-wide">Raider Tips</h3>
+          <div className="bg-arc-accent/20 rounded-full p-2">
+            💡
+          </div>
+          <h3 className="text-lg font-bold text-white tracking-wide">Raider Tip</h3>
         </div>
-        <ul className="space-y-3 text-sm text-gray-400">
-          <li className="flex items-start space-x-2">
-            <span className="text-arc-accent mt-1">▸</span>
-            <span>Completing an expedition <strong className="text-white">wipes</strong> your progress but increases your level.</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-arc-accent mt-1">▸</span>
-            <span>Use the <strong className="text-white">Workbench</strong> tab to find materials needed for station upgrades.</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-arc-accent mt-1">▸</span>
-            <span>Check <strong className="text-white">Safe Items</strong> to know what's safe to recycle or sell.</span>
-          </li>
-          <li className="flex items-start space-x-2">
-            <span className="text-arc-accent mt-1">▸</span>
-            <span>Your progress is <strong className="text-white">automatically saved</strong> to the database.</span>
-          </li>
-        </ul>
+        {raiderTip ? (
+          <div className="bg-gradient-to-br from-arc-accent/10 to-transparent rounded-lg p-4 border border-arc-accent/30">
+            <p className="text-gray-300 leading-relaxed">{raiderTip}</p>
+          </div>
+        ) : (
+          <div className="bg-arc-900/50 rounded-lg p-4 border border-arc-700">
+            <p className="text-gray-400 italic">Loading tip...</p>
+          </div>
+        )}
+        <div className="mt-4 pt-4 border-t border-arc-700">
+          <p className="text-xs text-gray-500 text-center">
+            💡 Refresh the page for a new tip
+          </p>
+        </div>
       </div>
 
       {/* Twitter Feed */}
@@ -589,6 +745,21 @@ const QuestsView = ({
           <p>No quests found matching "{searchQuery}"</p>
         </div>
       )}
+
+      {/* Attribution */}
+      <div className="mt-8 pt-4 border-t border-arc-700 text-center">
+        <p className="text-sm text-gray-500">
+          Quest walkthroughs sourced from{' '}
+          <a
+            href="https://patchcrazy.co.uk/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-arc-accent hover:text-red-400 transition-colors underline"
+          >
+            patchcrazy.co.uk
+          </a>
+        </p>
+      </div>
     </div>
   );
 };
@@ -885,57 +1056,116 @@ const WorkbenchesView = ({
   );
 };
 
-// --- Expedition Parts View ---
+// --- Expedition View ---
 const ExpeditionPartsView = ({
   completedExpeditionParts,
-  onToggleExpeditionPart
+  completedExpeditionItems,
+  onToggleExpeditionItem
 }: {
   completedExpeditionParts: string[],
-  onToggleExpeditionPart: (name: string) => void
+  completedExpeditionItems: { part_name: string, item_name: string }[],
+  onToggleExpeditionItem: (partName: string, itemName: string) => void
 }) => {
-  const isCompleted = (name: string) => completedExpeditionParts.includes(name);
+  const [requirements, setRequirements] = useState<any[]>([]);
+  const [expeditionLevel, setExpeditionLevel] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Get materials for an expedition part from CRAFTING_ITEMS
-  const getMaterialsForPart = (partName: string) => {
-    return CRAFTING_ITEMS.filter(item => item.neededFor === partName);
+  useEffect(() => {
+    loadRequirements();
+  }, []);
+
+  const loadRequirements = async () => {
+    try {
+      setIsLoading(true);
+      const response = await raider.getExpeditionRequirements();
+      setExpeditionLevel(response.data.expeditionLevel);
+      setRequirements(response.data.requirements);
+    } catch (error) {
+      console.error('Failed to load expedition requirements:', error);
+      // Fallback to constants if API fails
+      setRequirements([]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const parts = ['Part 1', 'Part 2', 'Part 3', 'Part 4', 'Part 5'];
+  // Check if an individual item is completed
+  const isItemCompleted = (partName: string, itemName: string) => {
+    return completedExpeditionItems.some(
+      item => item.part_name === partName && item.item_name === itemName
+    );
+  };
+
+  // Get materials for an expedition part from loaded requirements
+  const getMaterialsForPart = (partNumber: number) => {
+    return requirements.filter(req => req.part_number === partNumber);
+  };
+
+  // Get count of completed items for a part
+  const getCompletedItemsCount = (partNumber: number) => {
+    const materials = getMaterialsForPart(partNumber);
+    return materials.filter(mat => isItemCompleted(`Part ${partNumber}`, mat.item_name)).length;
+  };
+
+  // Check if all items in a part are completed
+  const isPartFullyCompleted = (partNumber: number) => {
+    const materials = getMaterialsForPart(partNumber);
+    return materials.length > 0 && materials.every(mat => isItemCompleted(`Part ${partNumber}`, mat.item_name));
+  };
+
+  const parts = [1, 2, 3, 4, 5];
+
+  // Count how many parts are fully completed
+  const fullyCompletedParts = parts.filter(part => isPartFullyCompleted(part)).length;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader className="animate-spin text-arc-accent" size={48} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <SectionHeader title="Expedition Parts" description="Track your expedition completion progress" />
+      <SectionHeader 
+        title={`Expedition ${expeditionLevel}`} 
+        description="Track your expedition completion progress" 
+      />
 
       {/* Progress Summary */}
       <div className="bg-arc-800 rounded-xl p-6 border border-arc-700 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-2xl font-black text-white mb-2">Expedition Progress</h3>
-            <p className="text-gray-400">Complete all 5 parts to finish the expedition</p>
+            <p className="text-gray-400">Complete all materials for each part to finish the expedition</p>
           </div>
           <div className="text-center">
             <div className="text-5xl font-black text-arc-gold">
-              {completedExpeditionParts.length}<span className="text-3xl text-gray-600">/5</span>
+              {fullyCompletedParts}<span className="text-3xl text-gray-600">/5</span>
             </div>
             <div className="text-sm text-gray-500 mt-1">
-              {((completedExpeditionParts.length / 5) * 100).toFixed(0)}% Complete
+              {((fullyCompletedParts / 5) * 100).toFixed(0)}% Complete
             </div>
           </div>
         </div>
       </div>
 
-      {/* Expedition Parts */}
+      {/* Expedition */}
       <div className="space-y-4">
-        {parts.map(partName => {
-          const materials = getMaterialsForPart(partName);
-          const completed = isCompleted(partName);
+        {parts.map(partNumber => {
+          const materials = getMaterialsForPart(partNumber);
+          const completedCount = getCompletedItemsCount(partNumber);
+          const totalCount = materials.length;
+          const fullyCompleted = isPartFullyCompleted(partNumber);
+          const partName = `Part ${partNumber}`;
           
           return (
             <div
-              key={partName}
+              key={partNumber}
               className={`
                 bg-arc-800/50 rounded-lg border transition-all
-                ${completed
+                ${fullyCompleted
                   ? 'border-green-900/50 bg-green-950/10'
                   : 'border-arc-700 hover:border-arc-600'
                 }
@@ -943,51 +1173,77 @@ const ExpeditionPartsView = ({
             >
               <div className="p-6">
                 <div className="flex items-start gap-4">
-                  {/* Checkbox */}
-                  <button
-                    onClick={() => onToggleExpeditionPart(partName)}
-                    className="flex-shrink-0 mt-1 transition-transform hover:scale-110"
-                  >
-                    {completed ? (
+                  {/* Status Icon */}
+                  <div className="flex-shrink-0 mt-1">
+                    {fullyCompleted ? (
                       <CheckCircle className="text-green-500" size={28} />
                     ) : (
                       <Circle className="text-gray-600" size={28} />
                     )}
-                  </button>
+                  </div>
 
                   {/* Content */}
                   <div className="flex-grow">
-                    <h4 className={`text-2xl font-black mb-3 ${completed ? 'text-green-400 line-through' : 'text-white'}`}>
-                      {partName}
-                    </h4>
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className={`text-2xl font-black ${fullyCompleted ? 'text-green-400 line-through' : 'text-white'}`}>
+                        {partName}
+                      </h4>
+                      <div className="text-sm font-bold">
+                        <span className={fullyCompleted ? 'text-green-400' : 'text-arc-accent'}>
+                          {completedCount}/{totalCount}
+                        </span>
+                        <span className="text-gray-500 ml-1">items</span>
+                      </div>
+                    </div>
 
-                    {/* Materials Required */}
+                    {/* Materials Checklist */}
                     {materials.length > 0 ? (
                       <div className="space-y-2">
-                        <p className="text-xs text-gray-500 uppercase font-bold">Materials Required:</p>
-                        <div className="overflow-x-auto">
-                          <table className="w-full">
-                            <thead className="bg-arc-900/70">
-                              <tr>
-                                <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Item</th>
-                                <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Quantity</th>
-                                <th className="text-left p-3 text-xs uppercase text-gray-500 font-bold">Location</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {materials.map((mat, idx) => (
-                                <tr key={idx} className="border-t border-arc-700/50">
-                                  <td className="p-3 text-sm text-white font-medium">{mat.item}</td>
-                                  <td className="p-3 text-sm text-arc-accent font-mono font-bold">{mat.quantity}</td>
-                                  <td className="p-3 text-sm text-gray-400">{mat.location}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                        {materials.map((mat, idx) => {
+                          const itemCompleted = isItemCompleted(partName, mat.item_name);
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`
+                                flex items-center gap-3 p-3 rounded
+                                transition-all
+                                ${itemCompleted
+                                  ? 'bg-green-950/20 border border-green-900/30'
+                                  : 'bg-arc-900/50 border border-arc-700/50 hover:border-arc-600'
+                                }
+                              `}
+                            >
+                              {/* Checkbox */}
+                              <button
+                                onClick={() => onToggleExpeditionItem(partName, mat.item_name)}
+                                className="flex-shrink-0 transition-transform hover:scale-110"
+                              >
+                                {itemCompleted ? (
+                                  <CheckCircle className="text-green-500" size={20} />
+                                ) : (
+                                  <Circle className="text-gray-600" size={20} />
+                                )}
+                              </button>
+
+                              {/* Item Details */}
+                              <div className="flex-grow grid grid-cols-3 gap-4">
+                                <div className={`text-sm font-medium ${itemCompleted ? 'text-gray-500 line-through' : 'text-white'}`}>
+                                  {mat.item_name}
+                                </div>
+                                <div className={`text-sm font-mono font-bold ${itemCompleted ? 'text-gray-600' : 'text-arc-accent'}`}>
+                                  {mat.quantity}
+                                </div>
+                                <div className={`text-sm ${itemCompleted ? 'text-gray-600' : 'text-gray-400'}`}>
+                                  {mat.location}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500 italic">No materials data available</p>
+                      <p className="text-sm text-gray-500 italic">No materials required</p>
                     )}
                   </div>
                 </div>
@@ -999,8 +1255,6 @@ const ExpeditionPartsView = ({
     </div>
   );
 };
-
-// --- Safe Items View ---
 const SafeItemsView = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<'All' | 'Recycle' | 'Sell'>('All');
@@ -1356,7 +1610,7 @@ const RaiderSearchView = () => {
                   ? 'bg-green-950/30 border-green-900/50'
                   : 'bg-arc-900/50 border-arc-700'
               }`}>
-                <div className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Expedition Parts</div>
+                <div className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Expedition</div>
                 <div className={`text-2xl font-black ${
                   searchResult.stats.totalExpeditionPartsCompleted === 5 ? 'text-green-400' : 'text-white'
                 }`}>
@@ -1552,37 +1806,94 @@ const RaiderSearchView = () => {
             </div>
           </div>
 
-          {/* Completed Expedition Parts */}
+          {/* Completed Expedition */}
           <div className="bg-arc-800/50 rounded-lg border border-arc-700 overflow-hidden">
             <div className="bg-arc-800 border-b-2 border-arc-accent px-4 py-3">
               <h3 className="text-xl font-black text-white flex items-center gap-2">
                 <Package size={20} className="text-arc-accent" />
-                Expedition Parts ({searchResult.stats.totalExpeditionPartsCompleted}/5)
+                Expedition ({searchResult.stats.totalExpeditionPartsCompleted}/5)
               </h3>
             </div>
             
-            <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {['Part 1', 'Part 2', 'Part 3', 'Part 4', 'Part 5'].map(part => {
-                const isCompleted = searchResult.expeditionPartsCompleted?.includes(part);
+            <div className="p-4 space-y-4">
+              {[1, 2, 3, 4, 5].map(partNumber => {
+                const partName = `Part ${partNumber}`;
+                const materials = searchResult.expeditionRequirements?.filter(
+                  (req: any) => req.part_number === partNumber
+                ) || [];
+                const completedItems = searchResult.expeditionItemsCompleted?.filter(
+                  (item: any) => item.part_name === partName
+                ) || [];
+                const completedCount = completedItems.length;
+                const totalCount = materials.length;
+                const isFullyCompleted = totalCount > 0 && completedCount === totalCount;
+                
                 return (
                   <div
-                    key={part}
-                    className={`p-3 rounded border transition-all ${
-                      isCompleted
+                    key={partNumber}
+                    className={`rounded-lg border p-4 ${
+                      isFullyCompleted
                         ? 'bg-green-950/20 border-green-900/50'
                         : 'bg-arc-900/30 border-arc-700'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      {isCompleted ? (
-                        <CheckCircle className="text-green-500 flex-shrink-0" size={16} />
-                      ) : (
-                        <Circle className="text-gray-600 flex-shrink-0" size={16} />
-                      )}
-                      <span className={`text-sm font-medium ${isCompleted ? 'text-green-400' : 'text-gray-400'}`}>
-                        {part}
-                      </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        {isFullyCompleted ? (
+                          <CheckCircle className="text-green-500 flex-shrink-0" size={20} />
+                        ) : (
+                          <Circle className="text-gray-600 flex-shrink-0" size={20} />
+                        )}
+                        <span className={`text-lg font-bold ${isFullyCompleted ? 'text-green-400 line-through' : 'text-white'}`}>
+                          {partName}
+                        </span>
+                      </div>
+                      <div className="text-sm font-bold">
+                        <span className={isFullyCompleted ? 'text-green-400' : 'text-arc-accent'}>
+                          {completedCount}/{totalCount}
+                        </span>
+                        <span className="text-gray-500 ml-1">items</span>
+                      </div>
                     </div>
+                    
+                    {/* Material breakdown */}
+                    {materials.length > 0 && (
+                      <div className="space-y-2">
+                        {materials.map((mat: any, idx: number) => {
+                          const isItemCompleted = completedItems.some(
+                            (item: any) => item.item_name === mat.item_name
+                          );
+                          
+                          return (
+                            <div
+                              key={idx}
+                              className={`flex items-center gap-3 p-2 rounded text-sm ${
+                                isItemCompleted
+                                  ? 'bg-green-950/20 border border-green-900/30'
+                                  : 'bg-arc-900/20'
+                              }`}
+                            >
+                              {isItemCompleted ? (
+                                <CheckCircle className="text-green-500 flex-shrink-0" size={14} />
+                              ) : (
+                                <Circle className="text-gray-600 flex-shrink-0" size={14} />
+                              )}
+                              <div className="flex-grow grid grid-cols-3 gap-2">
+                                <span className={isItemCompleted ? 'text-gray-500 line-through' : 'text-white'}>
+                                  {mat.item_name}
+                                </span>
+                                <span className={`font-mono ${isItemCompleted ? 'text-gray-600' : 'text-arc-accent'}`}>
+                                  {mat.quantity}
+                                </span>
+                                <span className={isItemCompleted ? 'text-gray-600' : 'text-gray-400'}>
+                                  {mat.location}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1609,6 +1920,7 @@ const BlueprintManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingBlueprint, setEditingBlueprint] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     workshop: '',
@@ -1708,6 +2020,12 @@ const BlueprintManager = () => {
     );
   }
 
+  // Filter blueprints based on search
+  const filteredBlueprints = blueprints.filter(blueprint =>
+    blueprint.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    blueprint.workshop.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -1719,6 +2037,18 @@ const BlueprintManager = () => {
           <PlusIcon size={20} />
           Add Blueprint
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+        <input
+          type="text"
+          placeholder="Search blueprints by name or workshop..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-arc-800 text-white pl-12 pr-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+        />
       </div>
 
       {/* Add/Edit Modal */}
@@ -1829,7 +2159,7 @@ const BlueprintManager = () => {
 
       {/* Blueprint List */}
       <div className="space-y-3">
-        {blueprints.map((blueprint) => (
+        {filteredBlueprints.map((blueprint) => (
           <div key={blueprint.id} className="bg-arc-800 border border-arc-700 rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -1879,6 +2209,13 @@ const BlueprintManager = () => {
         ))}
       </div>
 
+      {filteredBlueprints.length === 0 && blueprints.length > 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Search size={48} className="mx-auto mb-4 opacity-50" />
+          <p>No blueprints found matching "{searchQuery}"</p>
+        </div>
+      )}
+
       {blueprints.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <Hammer size={48} className="mx-auto mb-4 opacity-50" />
@@ -1895,6 +2232,7 @@ const QuestManager = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [editingQuest, setEditingQuest] = useState<any>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     id: '',
     name: '',
@@ -2056,6 +2394,13 @@ const QuestManager = () => {
     );
   }
 
+  // Filter quests based on search
+  const filteredQuests = quests.filter(quest => 
+    quest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    quest.id.toString().includes(searchQuery) ||
+    (quest.locations && quest.locations.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -2067,6 +2412,18 @@ const QuestManager = () => {
           <PlusIcon size={20} />
           Add Quest
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+        <input
+          type="text"
+          placeholder="Search quests by name, ID, or location..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-arc-800 text-white pl-12 pr-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+        />
       </div>
 
       {/* Add/Edit Modal */}
@@ -2213,7 +2570,7 @@ const QuestManager = () => {
 
       {/* Quest List */}
       <div className="space-y-3">
-        {quests.map((quest) => (
+        {filteredQuests.map((quest) => (
           <div key={quest.id} className="bg-arc-800 border border-arc-700 rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -2265,6 +2622,13 @@ const QuestManager = () => {
         ))}
       </div>
 
+      {filteredQuests.length === 0 && quests.length > 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Search size={48} className="mx-auto mb-4 opacity-50" />
+          <p>No quests found matching "{searchQuery}"</p>
+        </div>
+      )}
+
       {quests.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <Settings size={48} className="mx-auto mb-4 opacity-50" />
@@ -2280,6 +2644,7 @@ const UserManager = () => {
   const [users, setUsers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -2381,6 +2746,13 @@ const UserManager = () => {
     );
   }
 
+  // Filter users based on search
+  const filteredUsers = users.filter(user =>
+    user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    user.id.toString().includes(searchQuery)
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
@@ -2392,6 +2764,18 @@ const UserManager = () => {
           <PlusIcon size={20} />
           Add User
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
+        <input
+          type="text"
+          placeholder="Search users by username, email, or ID..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-arc-800 text-white pl-12 pr-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+        />
       </div>
 
       {/* Add Modal */}
@@ -2485,7 +2869,7 @@ const UserManager = () => {
             </tr>
           </thead>
           <tbody>
-            {users.map((user) => (
+            {filteredUsers.map((user) => (
               <tr key={user.id} className="border-b border-arc-700 hover:bg-arc-800/50 transition-colors">
                 <td className="p-3 text-gray-400 font-mono text-sm">{user.id}</td>
                 <td className="p-3 text-white font-medium">{user.username}</td>
@@ -2541,6 +2925,13 @@ const UserManager = () => {
         </table>
       </div>
 
+      {filteredUsers.length === 0 && users.length > 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Search size={48} className="mx-auto mb-4 opacity-50" />
+          <p>No users found matching "{searchQuery}"</p>
+        </div>
+      )}
+
       {users.length === 0 && (
         <div className="text-center py-12 text-gray-500">
           <User size={48} className="mx-auto mb-4 opacity-50" />
@@ -2551,9 +2942,695 @@ const UserManager = () => {
   );
 };
 
+// --- Settings View ---
+const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
+  const { user, logout, setUser } = useAuth();
+  const [newUsername, setNewUsername] = useState(user?.username || '');
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const handleUpdateUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newUsername.trim().length < 3) {
+      alert('Username must be at least 3 characters');
+      return;
+    }
+
+    if (newUsername === user?.username) {
+      alert('Please enter a different username');
+      return;
+    }
+
+    try {
+      setIsUpdatingUsername(true);
+      await raider.updateUsername(newUsername.trim());
+      
+      // Update user context
+      if (user) {
+        setUser({ ...user, username: newUsername.trim() });
+      }
+      
+      // Refresh profile data
+      await onRefresh();
+      
+      alert('Username updated successfully! Your changes are reflected everywhere.');
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to update username');
+      setNewUsername(user?.username || '');
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handleResetAccount = async () => {
+    try {
+      console.log('Attempting to reset account...');
+      const response = await raider.resetAccount();
+      console.log('Reset response:', response);
+      
+      setShowResetModal(false);
+      
+      // Refresh profile data
+      await onRefresh();
+      
+      alert('Account reset successfully! All progress has been wiped.');
+    } catch (error: any) {
+      console.error('Reset account error:', error);
+      console.error('Error response:', error.response);
+      alert(error.response?.data?.error || 'Failed to reset account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      await raider.deleteAccount();
+      alert('Account deleted successfully. You will now be logged out.');
+      setShowDeleteModal(false);
+      logout();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to delete account');
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (newPassword.length < 6) {
+      alert('New password must be at least 6 characters');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      console.log('Attempting to update password...');
+      const response = await raider.updatePassword(currentPassword, newPassword);
+      console.log('Password update response:', response);
+      
+      // Clear form
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      alert('Password updated successfully!');
+    } catch (error: any) {
+      console.error('Password update error:', error);
+      console.error('Error response:', error.response);
+      const errorMessage = error.response?.data?.error || error.response?.data?.details || 'Failed to update password';
+      alert(errorMessage);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <SectionHeader title="Account Settings" description="Manage your account preferences" />
+
+      {/* Reset Confirmation Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-red-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-red-900/50">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="bg-red-900/30 p-4 rounded-full border border-red-700 text-red-500">
+                <AlertTriangle size={48} />
+              </div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-wider">Reset Account?</h3>
+              <div className="text-gray-300 space-y-2 text-sm">
+                <p className="p-3 bg-arc-800 rounded border border-red-900/30 text-red-200">
+                  <AlertTriangle className="inline mb-1 mr-1" size={14}/>
+                  WARNING: This will <strong>WIPE</strong> all your progress!
+                </p>
+                <p>This will:</p>
+                <ul className="text-left space-y-1 pl-4">
+                  <li>• Delete all completed quests</li>
+                  <li>• Delete all owned blueprints</li>
+                  <li>• Delete all completed workbenches</li>
+                  <li>• Delete all expedition parts</li>
+                  <li>• Reset your expedition level to 0</li>
+                </ul>
+                <p className="text-red-400 font-bold mt-3">This action cannot be undone!</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 w-full mt-4">
+                <button 
+                  onClick={() => setShowResetModal(false)}
+                  className="py-3 px-4 rounded border border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white font-bold transition-colors"
+                >
+                  CANCEL
+                </button>
+                <button 
+                  onClick={handleResetAccount}
+                  className="py-3 px-4 rounded bg-red-600 text-white hover:bg-red-700 font-bold tracking-wide shadow-lg shadow-red-900/40 transition-all transform hover:scale-105"
+                >
+                  RESET ACCOUNT
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-red-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-red-900/50">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="bg-red-900/30 p-4 rounded-full border border-red-700 text-red-500">
+                <TrashIcon size={48} />
+              </div>
+              <h3 className="text-2xl font-black text-white uppercase tracking-wider">Delete Account?</h3>
+              <div className="text-gray-300 space-y-2 text-sm">
+                <p className="p-3 bg-arc-800 rounded border border-red-900/30 text-red-200">
+                  <AlertTriangle className="inline mb-1 mr-1" size={14}/>
+                  WARNING: This will <strong>PERMANENTLY DELETE</strong> your account!
+                </p>
+                <p>This will:</p>
+                <ul className="text-left space-y-1 pl-4">
+                  <li>• Delete your user account</li>
+                  <li>• Delete all your raider profiles</li>
+                  <li>• Delete all your progress</li>
+                  <li>• Delete all your favorites</li>
+                  <li>• Remove all your data from the system</li>
+                </ul>
+                <p className="text-red-400 font-bold mt-3">This action is PERMANENT and cannot be undone!</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 w-full mt-4">
+                <button 
+                  onClick={() => setShowDeleteModal(false)}
+                  className="py-3 px-4 rounded border border-gray-600 text-gray-400 hover:bg-gray-800 hover:text-white font-bold transition-colors"
+                >
+                  CANCEL
+                </button>
+                <button 
+                  onClick={handleDeleteAccount}
+                  className="py-3 px-4 rounded bg-red-600 text-white hover:bg-red-700 font-bold tracking-wide shadow-lg shadow-red-900/40 transition-all transform hover:scale-105"
+                >
+                  DELETE ACCOUNT
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Username Update */}
+      <div className="bg-arc-800 rounded-xl p-6 border border-arc-700 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <User size={24} className="text-arc-accent" />
+          <h3 className="text-xl font-black text-white">Change Username</h3>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Update your username. This will be reflected throughout the app and in your raider profile.
+        </p>
+        <form onSubmit={handleUpdateUsername} className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Current Username</label>
+            <div className="bg-arc-900/50 text-gray-500 px-4 py-3 rounded border border-arc-700 font-mono">
+              {user?.username}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">New Username</label>
+            <input
+              type="text"
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              className="w-full bg-arc-900 text-white px-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+              placeholder="Enter new username"
+              minLength={3}
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">Minimum 3 characters</p>
+          </div>
+          <button
+            type="submit"
+            disabled={isUpdatingUsername || newUsername === user?.username}
+            className="flex items-center gap-2 px-6 py-3 bg-arc-accent text-white rounded font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdatingUsername ? (
+              <>
+                <Loader className="animate-spin" size={18} />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                Update Username
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+
+      {/* Password Update */}
+      <div className="bg-arc-800 rounded-xl p-6 border border-arc-700 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <Settings size={24} className="text-arc-accent" />
+          <h3 className="text-xl font-black text-white">Change Password</h3>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Update your password to keep your account secure.
+        </p>
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Current Password</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full bg-arc-900 text-white px-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+              placeholder="Enter current password"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">New Password</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full bg-arc-900 text-white px-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+              placeholder="Enter new password"
+              minLength={6}
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-arc-900 text-white px-4 py-3 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+              placeholder="Confirm new password"
+              minLength={6}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={isUpdatingPassword}
+            className="flex items-center gap-2 px-6 py-3 bg-arc-accent text-white rounded font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUpdatingPassword ? (
+              <>
+                <Loader className="animate-spin" size={18} />
+                Updating...
+              </>
+            ) : (
+              <>
+                <Save size={18} />
+                Update Password
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-arc-800 rounded-xl p-6 border-2 border-red-900/50 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <AlertTriangle size={24} className="text-red-500" />
+          <h3 className="text-xl font-black text-white">Danger Zone</h3>
+        </div>
+        <p className="text-gray-400 text-sm mb-6">
+          These actions are permanent and cannot be undone. Proceed with caution.
+        </p>
+
+        <div className="space-y-4">
+          {/* Reset Account */}
+          <div className="bg-arc-900/50 rounded-lg p-4 border border-red-900/30">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h4 className="text-lg font-bold text-white mb-1">Reset Account Progress</h4>
+                <p className="text-sm text-gray-400">
+                  Wipe all your progress (quests, blueprints, workbenches, expedition parts) and reset to expedition level 0.
+                  Your username and account will remain.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowResetModal(true)}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-900/30 text-red-400 rounded border border-red-900/50 hover:bg-red-900/50 hover:text-red-300 transition-colors font-bold"
+              >
+                <Rocket size={18} />
+                Reset Progress
+              </button>
+            </div>
+          </div>
+
+          {/* Delete Account */}
+          <div className="bg-arc-900/50 rounded-lg p-4 border border-red-900/30">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <h4 className="text-lg font-bold text-white mb-1">Delete Account</h4>
+                <p className="text-sm text-gray-400">
+                  Permanently delete your account and all associated data. This action cannot be reversed.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors font-bold"
+              >
+                <TrashIcon size={18} />
+                Delete Account
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Account Info */}
+      <div className="bg-arc-800 rounded-xl p-6 border border-arc-700 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <Info size={24} className="text-arc-accent" />
+          <h3 className="text-xl font-black text-white">Account Information</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Username</label>
+            <div className="text-white font-medium">{user?.username}</div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 uppercase font-bold mb-1">Email</label>
+            <div className="text-white font-mono">{user?.email}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Expedition Requirements Manager ---
+const ExpeditionRequirementsManager = () => {
+  const [selectedLevel, setSelectedLevel] = useState<number>(1);
+  const [requirements, setRequirements] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingRequirement, setEditingRequirement] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    part_number: 1,
+    item_name: '',
+    quantity: '',
+    location: '',
+    display_order: 0
+  });
+
+  useEffect(() => {
+    loadRequirements();
+  }, [selectedLevel]);
+
+  const loadRequirements = async () => {
+    try {
+      setIsLoading(true);
+      const response = await admin.getExpeditionRequirements(selectedLevel);
+      setRequirements(response.data.requirements);
+    } catch (error: any) {
+      console.error('Failed to load requirements:', error);
+      alert('Failed to load requirements');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddNew = (partNumber: number) => {
+    setFormData({
+      part_number: partNumber,
+      item_name: '',
+      quantity: '',
+      location: '',
+      display_order: 0
+    });
+    setEditingRequirement(null);
+    setShowAddForm(true);
+  };
+
+  const handleEdit = (requirement: any) => {
+    setFormData({
+      part_number: requirement.part_number,
+      item_name: requirement.item_name,
+      quantity: requirement.quantity,
+      location: requirement.location,
+      display_order: requirement.display_order
+    });
+    setEditingRequirement(requirement);
+    setShowAddForm(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingRequirement) {
+        await admin.updateExpeditionRequirement(editingRequirement.id, {
+          item_name: formData.item_name,
+          quantity: formData.quantity,
+          location: formData.location,
+          display_order: formData.display_order
+        });
+        alert('Requirement updated successfully!');
+      } else {
+        await admin.createExpeditionRequirement({
+          expedition_level: selectedLevel,
+          part_number: formData.part_number,
+          item_name: formData.item_name,
+          quantity: formData.quantity,
+          location: formData.location,
+          display_order: formData.display_order
+        });
+        alert('Requirement created successfully!');
+      }
+      setShowAddForm(false);
+      loadRequirements();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to save requirement');
+    }
+  };
+
+  const handleDelete = async (id: number, itemName: string) => {
+    if (!confirm(`Delete "${itemName}"?`)) return;
+    
+    try {
+      await admin.deleteExpeditionRequirement(id);
+      alert('Requirement deleted successfully!');
+      loadRequirements();
+    } catch (error: any) {
+      alert('Failed to delete requirement');
+    }
+  };
+
+  const handleCopy = async () => {
+    const toLevel = prompt(`Copy Expedition ${selectedLevel} requirements to which expedition level?`);
+    if (!toLevel) return;
+    
+    try {
+      await admin.copyExpeditionRequirements(selectedLevel, parseInt(toLevel));
+      alert(`Successfully copied to Expedition ${toLevel}!`);
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to copy requirements');
+    }
+  };
+
+  const groupedRequirements = requirements.reduce((acc, req) => {
+    if (!acc[req.part_number]) acc[req.part_number] = [];
+    acc[req.part_number].push(req);
+    return acc;
+  }, {} as Record<number, any[]>);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader className="animate-spin text-arc-accent" size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <SectionHeader title="Expedition Requirements Manager" description="Configure expedition requirements for each level" />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-400 font-bold">Expedition Level:</label>
+            <input
+              type="number"
+              min="1"
+              value={selectedLevel}
+              onChange={(e) => setSelectedLevel(parseInt(e.target.value) || 1)}
+              className="w-20 bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none text-center font-bold"
+            />
+          </div>
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-900/30 text-blue-400 rounded font-bold hover:bg-blue-900/50 transition-colors"
+          >
+            Copy to Another Level
+          </button>
+        </div>
+      </div>
+
+      {/* Add/Edit Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-arc-900 border-2 border-arc-accent rounded-xl p-6 max-w-2xl w-full">
+            <h3 className="text-2xl font-bold text-white mb-6">
+              {editingRequirement ? 'Edit Requirement' : `Add Requirement to Part ${formData.part_number}`}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Item Name *</label>
+                <input
+                  type="text"
+                  value={formData.item_name}
+                  onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
+                  className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                  placeholder="e.g., Metal Parts"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Quantity *</label>
+                <input
+                  type="text"
+                  value={formData.quantity}
+                  onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                  className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                  placeholder="e.g., 150 or 250k Value"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Location *</label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                  placeholder="e.g., Basic Materials"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Display Order</label>
+                <input
+                  type="number"
+                  value={formData.display_order}
+                  onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
+                  className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-6 py-3 bg-arc-accent text-white rounded font-bold hover:bg-red-700 transition-colors"
+                >
+                  {editingRequirement ? 'Update' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="px-6 py-3 bg-arc-700 text-gray-300 rounded font-bold hover:bg-arc-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Parts List */}
+      <div className="space-y-6">
+        {[1, 2, 3, 4, 5].map(partNumber => {
+          const partRequirements = groupedRequirements[partNumber] || [];
+          
+          return (
+            <div key={partNumber} className="bg-arc-800 rounded-xl border border-arc-700 overflow-hidden">
+              <div className="bg-arc-900/70 border-b border-arc-700 px-6 py-4 flex items-center justify-between">
+                <h3 className="text-xl font-black text-white">Part {partNumber}</h3>
+                <button
+                  onClick={() => handleAddNew(partNumber)}
+                  className="flex items-center gap-2 px-4 py-2 bg-arc-accent text-white rounded font-bold hover:bg-red-700 transition-colors text-sm"
+                >
+                  <PlusIcon size={16} />
+                  Add Item
+                </button>
+              </div>
+              
+              <div className="p-6">
+                {partRequirements.length > 0 ? (
+                  <div className="space-y-3">
+                    {partRequirements.map((req: any) => (
+                      <div
+                        key={req.id}
+                        className="flex items-center justify-between p-4 bg-arc-900/50 rounded border border-arc-700 hover:border-arc-600 transition-colors"
+                      >
+                        <div className="flex-grow grid grid-cols-3 gap-4">
+                          <div className="text-white font-medium">{req.item_name}</div>
+                          <div className="text-arc-accent font-mono font-bold">{req.quantity}</div>
+                          <div className="text-gray-400">{req.location}</div>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => handleEdit(req)}
+                            className="p-2 bg-blue-900/30 text-blue-400 rounded hover:bg-blue-900/50 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(req.id, req.item_name)}
+                            className="p-2 bg-red-900/30 text-red-400 rounded hover:bg-red-900/50 transition-colors"
+                            title="Delete"
+                          >
+                            <TrashIcon size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <Package size={48} className="mx-auto mb-4 opacity-30" />
+                    <p>No items for Part {partNumber}. Click "Add Item" to create one.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {requirements.length === 0 && (
+        <div className="text-center py-12 text-gray-500">
+          <Settings size={64} className="mx-auto mb-4 opacity-30" />
+          <p className="text-lg mb-2">No requirements found for Expedition {selectedLevel}</p>
+          <p className="text-sm">Add items to each part or copy from another expedition level</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // --- Admin View with Tabs ---
 const AdminView = () => {
-  const [activeTab, setActiveTab] = useState<'quests' | 'blueprints' | 'users'>('quests');
+  const [activeTab, setActiveTab] = useState<'quests' | 'blueprints' | 'users' | 'expeditions'>('quests');
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -2590,6 +3667,21 @@ const AdminView = () => {
           </div>
         </button>
         <button
+          onClick={() => setActiveTab('expeditions')}
+          className={`
+            px-6 py-3 rounded-t font-bold uppercase tracking-wide transition-all duration-200
+            ${activeTab === 'expeditions' 
+              ? 'bg-arc-accent text-white shadow-lg' 
+              : 'bg-arc-800 text-gray-400 hover:text-white hover:bg-arc-700'
+            }
+          `}
+        >
+          <div className="flex items-center gap-2">
+            <Package size={20} />
+            Expedition Manager
+          </div>
+        </button>
+        <button
           onClick={() => setActiveTab('users')}
           className={`
             px-6 py-3 rounded-t font-bold uppercase tracking-wide transition-all duration-200
@@ -2610,6 +3702,7 @@ const AdminView = () => {
       {activeTab === 'quests' && <QuestManager />}
       {activeTab === 'blueprints' && <BlueprintManager />}
       {activeTab === 'users' && <UserManager />}
+      {activeTab === 'expeditions' && <ExpeditionRequirementsManager />}
     </div>
   );
 };
@@ -2617,7 +3710,7 @@ const AdminView = () => {
 // --- Main App ---
 export default function App() {
   const { user, logout } = useAuth();
-  const { profileData, isLoading, toggleQuest, toggleBlueprint, toggleWorkbench, toggleExpeditionPart, completeExpedition } = useRaiderProfile();
+  const { profileData, isLoading, toggleQuest, toggleBlueprint, toggleWorkbench, toggleExpeditionPart, toggleExpeditionItem, completeExpedition, refresh } = useRaiderProfile();
   const [currentView, setCurrentView] = useState<AppViewState>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -2675,7 +3768,7 @@ export default function App() {
             <SidebarItem icon={Map} label="Quests" isActive={currentView === 'quests'} onClick={() => navigate('quests')} />
             <SidebarItem icon={Scroll} label="Blueprints" isActive={currentView === 'blueprints'} onClick={() => navigate('blueprints')} />
             <SidebarItem icon={Wrench} label="Workbenches" isActive={currentView === 'workbenches'} onClick={() => navigate('workbenches')} />
-            <SidebarItem icon={Package} label="Expedition Parts" isActive={currentView === 'expedition-parts'} onClick={() => navigate('expedition-parts')} />
+            <SidebarItem icon={Package} label="Expedition" isActive={currentView === 'expedition-parts'} onClick={() => navigate('expedition-parts')} />
             <SidebarItem icon={Trash2} label="Safe Items" isActive={currentView === 'safe-items'} onClick={() => navigate('safe-items')} />
             <SidebarItem icon={Users} label="Raider Search" isActive={currentView === 'raider-search'} onClick={() => navigate('raider-search')} />
             {isAdmin && (
@@ -2695,6 +3788,14 @@ export default function App() {
                 <div className="text-[10px] text-arc-gold font-mono tracking-wider mt-0.5">Expedition {profileData?.expeditionLevel || 0}</div>
               </div>
             </div>
+            
+            <button
+              onClick={() => navigate('settings')}
+              className="w-full flex items-center justify-center space-x-2 px-3 py-2 bg-arc-900 hover:bg-arc-800 text-gray-400 hover:text-white rounded border border-arc-700 hover:border-arc-accent transition-colors text-sm font-bold"
+            >
+              <UserCog size={14} />
+              <span>SETTINGS</span>
+            </button>
             
             <button
               onClick={() => {
@@ -2720,9 +3821,10 @@ export default function App() {
           {currentView === 'quests' && <QuestsView completedQuests={profileData?.completedQuests || []} onToggleQuest={toggleQuest} />}
           {currentView === 'blueprints' && <BlueprintsView ownedBlueprints={profileData?.ownedBlueprints || []} onToggleBlueprint={toggleBlueprint} />}
           {currentView === 'workbenches' && <WorkbenchesView completedWorkbenches={profileData?.completedWorkbenches || []} onToggleWorkbench={toggleWorkbench} />}
-          {currentView === 'expedition-parts' && <ExpeditionPartsView completedExpeditionParts={profileData?.completedExpeditionParts || []} onToggleExpeditionPart={toggleExpeditionPart} />}
+          {currentView === 'expedition-parts' && <ExpeditionPartsView completedExpeditionParts={profileData?.completedExpeditionParts || []} completedExpeditionItems={profileData?.completedExpeditionItems || []} onToggleExpeditionItem={toggleExpeditionItem} />}
           {currentView === 'safe-items' && <SafeItemsView />}
           {currentView === 'raider-search' && <RaiderSearchView />}
+          {currentView === 'settings' && <SettingsView onRefresh={refresh} />}
           {currentView === 'admin' && isAdmin && <AdminView />}
         </div>
       </div>
