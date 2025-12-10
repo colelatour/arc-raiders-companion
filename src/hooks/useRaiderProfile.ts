@@ -63,8 +63,8 @@ export const useRaiderProfile = () => {
           ownedBlueprints: blueprintsResponse.data.ownedBlueprints,
           completedWorkbenches: workbenchesResponse.data.completedWorkbenches,
           completedExpeditionParts: expeditionPartsResponse.data.completedExpeditionParts,
-          questsCount: statsResponse.data.stats.quests_completed,
-          blueprintsCount: statsResponse.data.stats.blueprints_owned,
+          questsCount: questsResponse.data.completedQuests.length,
+          blueprintsCount: blueprintsResponse.data.ownedBlueprints.length,
           workbenchesCount: workbenchesResponse.data.completedWorkbenches.length,
           expeditionPartsCount: expeditionPartsResponse.data.completedExpeditionParts.length
         });

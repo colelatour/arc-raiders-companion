@@ -16,7 +16,7 @@ import {
   Terminal,
   Activity,
   AlertTriangle,
-  Skull,
+  Rocket,
   Twitter,
   LogOut,
   Loader,
@@ -162,7 +162,7 @@ const HomeView = ({
           <div className="bg-arc-900 border-2 border-red-600 rounded-xl p-8 max-w-md w-full shadow-2xl shadow-red-900/50">
              <div className="flex flex-col items-center text-center space-y-4">
                 <div className="bg-red-900/30 p-4 rounded-full border border-red-700 text-red-500">
-                  <Skull size={48} />
+                  <Rocket size={48} />
                 </div>
                 <h3 className="text-2xl font-black text-white uppercase tracking-wider">Confirm Expedition?</h3>
                 <div className="text-gray-300 space-y-2 text-sm">
@@ -307,7 +307,7 @@ const HomeView = ({
                 onClick={() => setShowWipeModal(true)}
                 className="group flex items-center gap-3 px-5 py-2 rounded border border-red-900/50 bg-red-950/20 hover:bg-red-900/40 text-red-400 hover:text-red-200 transition-all"
               >
-                <Skull size={18} className="group-hover:animate-pulse" />
+                <Rocket size={18} className="group-hover:animate-pulse" />
                 <span className="font-bold text-sm uppercase tracking-wide">Complete Expedition</span>
                 <span className="text-xs text-red-600/80 font-mono">(WIPE & LEVEL UP)</span>
               </button>

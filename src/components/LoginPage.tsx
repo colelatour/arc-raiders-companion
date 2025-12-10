@@ -25,7 +25,16 @@ export const LoginPage: React.FC = () => {
           setIsLoading(false);
           return;
         }
+        // Register the user but don't auto-login
         await register(email, username, password);
+        
+        // Clear form and switch to login
+        setEmail('');
+        setUsername('');
+        setPassword('');
+        setIsLogin(true);
+        setIsLoading(false);
+        setError('✅ Account created successfully! Please login.');
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Authentication failed');
@@ -89,9 +98,9 @@ export const LoginPage: React.FC = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
             {error && (
-              <div className="bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-start space-x-3 animate-fade-in">
-                <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
-                <p className="text-red-300 text-sm">{error}</p>
+              <div className={`${error.startsWith('✅') ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'} border rounded-lg p-4 flex items-start space-x-3 animate-fade-in`}>
+                <AlertTriangle size={20} className={`${error.startsWith('✅') ? 'text-green-500' : 'text-red-500'} flex-shrink-0 mt-0.5`} />
+                <p className={`${error.startsWith('✅') ? 'text-green-300' : 'text-red-300'} text-sm`}>{error}</p>
               </div>
             )}
 
