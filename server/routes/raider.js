@@ -38,11 +38,18 @@ router.post('/profiles', async (req, res) => {
       return res.status(409).json({ error: 'Profile already exists for this user' });
     }
 
-    const result = await pool.query(
-      `INSERT INTO raider_profiles (user_id, expedition_level) 
-       VALUES ($1, 0) 
-       RETURNING id, expedition_level, created_at`,
+    // Get username for raider_name
+    const userResult = await pool.query(
+      'SELECT username FROM users WHERE id = $1',
       [req.user.userId]
+    );
+    const username = userResult.rows[0].username;
+
+    const result = await pool.query(
+      `INSERT INTO raider_profiles (user_id, raider_name, expedition_level) 
+       VALUES ($1, $2, 0) 
+       RETURNING id, expedition_level, created_at`,
+      [req.user.userId, username]
     );
 
     res.status(201).json({ profile: result.rows[0] });
@@ -441,13 +448,24 @@ router.post('/profiles/:profileId/expedition/complete', async (req, res) => {
 router.get('/quests', async (req, res) => {
   try {
     const quests = await pool.query(`
-      SELECT q.id, q.name, q.locations, q.url,
-             array_agg(qo.objective_text ORDER BY qo.order_index) FILTER (WHERE qo.objective_text IS NOT NULL) as objectives,
-             array_agg(qr.reward_text ORDER BY qr.order_index) FILTER (WHERE qr.reward_text IS NOT NULL) as rewards
+      SELECT 
+        q.id, 
+        q.name, 
+        q.locations, 
+        q.url,
+        COALESCE(
+          (SELECT array_agg(objective_text ORDER BY order_index)
+           FROM quest_objectives 
+           WHERE quest_id = q.id), 
+          ARRAY[]::text[]
+        ) as objectives,
+        COALESCE(
+          (SELECT array_agg(reward_text ORDER BY order_index)
+           FROM quest_rewards 
+           WHERE quest_id = q.id), 
+          ARRAY[]::text[]
+        ) as rewards
       FROM quests q
-      LEFT JOIN quest_objectives qo ON q.id = qo.quest_id
-      LEFT JOIN quest_rewards qr ON q.id = qr.quest_id
-      GROUP BY q.id, q.name, q.locations, q.url
       ORDER BY q.id
     `);
     
