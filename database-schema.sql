@@ -1,6 +1,7 @@
 -- ARC Raiders Companion Database Schema with Data
--- Generated: 2025-12-10T00:16:03.404Z
+-- Generated: 2025-12-10T21:44:29.837Z
 -- PostgreSQL Database Schema and Data Dump
+-- Updated: Added email verification fields
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS favorite_raiders CASCADE;
@@ -33,6 +34,9 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP,
   is_active BOOLEAN DEFAULT true,
+  email_verified BOOLEAN DEFAULT false,
+  verification_token VARCHAR(255),
+  verification_token_expires TIMESTAMP,
   UNIQUE (email),
   UNIQUE (username)
 );
@@ -41,13 +45,15 @@ CREATE UNIQUE INDEX users_username_key ON public.users USING btree (username);
 CREATE INDEX idx_users_email ON public.users USING btree (email);
 CREATE INDEX idx_users_username ON public.users USING btree (username);
 CREATE INDEX idx_users_role ON public.users USING btree (role);
+CREATE INDEX idx_users_verification_token ON public.users USING btree (verification_token);
 
 -- Default Admin User
 -- Email: admin@arcraiders.com
 -- Username: admin
 -- Password: admin123
 -- ⚠️  IMPORTANT: Change this password after first login!
-INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at, is_active) VALUES (1, 'admin@arcraiders.com', 'admin', '$2b$10$z01AERBMPtKFZfFlny5AJelUd2WJ/5fLSy0Mz6hYp3wcyz9Lhr502', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE);
+-- Note: Admin user is pre-verified (email_verified = TRUE)
+INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at, is_active, email_verified) VALUES (1, 'admin@arcraiders.com', 'admin', '$2b$10$z01AERBMPtKFZfFlny5AJelUd2WJ/5fLSy0Mz6hYp3wcyz9Lhr502', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE, TRUE);
 
 -- Create default raider profile for admin user
 INSERT INTO raider_profiles (id, user_id, raider_name, expedition_level, created_at, updated_at, is_active) VALUES (1, 1, 'admin', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, TRUE);
