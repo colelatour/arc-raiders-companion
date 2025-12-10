@@ -87,6 +87,31 @@ export const raider = {
   
   toggleExpeditionPart: (profileId: number, partName: string) =>
     api.post(`/raider/profiles/${profileId}/expedition-parts/${encodeURIComponent(partName)}`),
+  
+  getCompletedExpeditionItems: (profileId: number) =>
+    api.get(`/raider/profiles/${profileId}/expedition-items`),
+  
+  toggleExpeditionItem: (profileId: number, partName: string, itemName: string) =>
+    api.post(`/raider/profiles/${profileId}/expedition-items/${encodeURIComponent(partName)}/${encodeURIComponent(itemName)}`),
+  
+  getExpeditionRequirements: () =>
+    api.get('/raider/expedition-requirements'),
+  
+  getRandomTip: () =>
+    api.get('/raider/tips/random'),
+  
+  // User settings
+  updateUsername: (newUsername: string) =>
+    api.put('/raider/settings/username', { newUsername }),
+  
+  updatePassword: (currentPassword: string, newPassword: string) =>
+    api.put('/raider/settings/password', { currentPassword, newPassword }),
+  
+  resetAccount: () =>
+    api.post('/raider/settings/reset'),
+  
+  deleteAccount: () =>
+    api.delete('/raider/settings/account'),
 };
 
 // Admin endpoints (require admin/manager role)
@@ -129,6 +154,37 @@ export const admin = {
   
   updateUserExpeditionLevel: (userId: number, expeditionLevel: number) =>
     api.put(`/admin/users/${userId}/expedition-level`, { expeditionLevel }),
+  
+  // Expedition Requirements management
+  getExpeditionRequirements: (expeditionLevel: number) =>
+    api.get(`/admin/expedition-requirements/${expeditionLevel}`),
+  
+  getExpeditionLevels: () =>
+    api.get('/admin/expedition-requirements-levels'),
+  
+  createExpeditionRequirement: (requirement: {
+    expedition_level: number;
+    part_number: number;
+    item_name: string;
+    quantity: string;
+    location: string;
+    display_order?: number;
+  }) =>
+    api.post('/admin/expedition-requirements', requirement),
+  
+  updateExpeditionRequirement: (id: number, requirement: {
+    item_name: string;
+    quantity: string;
+    location: string;
+    display_order?: number;
+  }) =>
+    api.put(`/admin/expedition-requirements/${id}`, requirement),
+  
+  deleteExpeditionRequirement: (id: number) =>
+    api.delete(`/admin/expedition-requirements/${id}`),
+  
+  copyExpeditionRequirements: (fromLevel: number, toLevel: number) =>
+    api.post('/admin/expedition-requirements/copy', { from_level: fromLevel, to_level: toLevel }),
 };
 
 export default api;

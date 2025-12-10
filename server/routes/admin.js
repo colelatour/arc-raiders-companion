@@ -444,4 +444,149 @@ router.put('/users/:id/expedition-level', async (req, res) => {
   }
 });
 
+// ===== EXPEDITION REQUIREMENTS MANAGEMENT =====
+
+// Get all expedition requirements for a specific expedition level
+router.get('/expedition-requirements/:expeditionLevel', async (req, res) => {
+  try {
+    const { expeditionLevel } = req.params;
+    
+    const result = await pool.query(
+      `SELECT * FROM expedition_requirements 
+       WHERE expedition_level = $1 
+       ORDER BY part_number, display_order`,
+      [expeditionLevel]
+    );
+    
+    res.json({ requirements: result.rows });
+  } catch (error) {
+    console.error('Error fetching expedition requirements:', error);
+    res.status(500).json({ error: 'Failed to fetch expedition requirements' });
+  }
+});
+
+// Get all unique expedition levels that have requirements
+router.get('/expedition-requirements-levels', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT DISTINCT expedition_level FROM expedition_requirements ORDER BY expedition_level'
+    );
+    
+    res.json({ levels: result.rows.map(r => r.expedition_level) });
+  } catch (error) {
+    console.error('Error fetching expedition levels:', error);
+    res.status(500).json({ error: 'Failed to fetch expedition levels' });
+  }
+});
+
+// Create new expedition requirement
+router.post('/expedition-requirements', async (req, res) => {
+  try {
+    const { expedition_level, part_number, item_name, quantity, location, display_order } = req.body;
+    
+    if (!expedition_level || !part_number || !item_name || !quantity || !location) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    const result = await pool.query(
+      `INSERT INTO expedition_requirements 
+       (expedition_level, part_number, item_name, quantity, location, display_order) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING *`,
+      [expedition_level, part_number, item_name, quantity, location, display_order || 0]
+    );
+    
+    res.json({ requirement: result.rows[0] });
+  } catch (error) {
+    console.error('Error creating expedition requirement:', error);
+    if (error.code === '23505') { // Unique violation
+      res.status(400).json({ error: 'This item already exists for this expedition and part' });
+    } else {
+      res.status(500).json({ error: 'Failed to create expedition requirement' });
+    }
+  }
+});
+
+// Update expedition requirement
+router.put('/expedition-requirements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { item_name, quantity, location, display_order } = req.body;
+    
+    const result = await pool.query(
+      `UPDATE expedition_requirements 
+       SET item_name = $1, quantity = $2, location = $3, display_order = $4, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $5 
+       RETURNING *`,
+      [item_name, quantity, location, display_order, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Requirement not found' });
+    }
+    
+    res.json({ requirement: result.rows[0] });
+  } catch (error) {
+    console.error('Error updating expedition requirement:', error);
+    res.status(500).json({ error: 'Failed to update expedition requirement' });
+  }
+});
+
+// Delete expedition requirement
+router.delete('/expedition-requirements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'DELETE FROM expedition_requirements WHERE id = $1 RETURNING *',
+      [id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Requirement not found' });
+    }
+    
+    res.json({ message: 'Requirement deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting expedition requirement:', error);
+    res.status(500).json({ error: 'Failed to delete expedition requirement' });
+  }
+});
+
+// Copy requirements from one expedition level to another
+router.post('/expedition-requirements/copy', async (req, res) => {
+  try {
+    const { from_level, to_level } = req.body;
+    
+    if (!from_level || !to_level) {
+      return res.status(400).json({ error: 'Missing required fields: from_level and to_level' });
+    }
+    
+    // First check if target level already has requirements
+    const existing = await pool.query(
+      'SELECT COUNT(*) FROM expedition_requirements WHERE expedition_level = $1',
+      [to_level]
+    );
+    
+    if (parseInt(existing.rows[0].count) > 0) {
+      return res.status(400).json({ error: `Expedition ${to_level} already has requirements. Delete them first if you want to copy.` });
+    }
+    
+    // Copy requirements
+    const result = await pool.query(
+      `INSERT INTO expedition_requirements (expedition_level, part_number, item_name, quantity, location, display_order)
+       SELECT $1, part_number, item_name, quantity, location, display_order
+       FROM expedition_requirements
+       WHERE expedition_level = $2
+       RETURNING *`,
+      [to_level, from_level]
+    );
+    
+    res.json({ message: `Copied ${result.rows.length} requirements to Expedition ${to_level}`, requirements: result.rows });
+  } catch (error) {
+    console.error('Error copying expedition requirements:', error);
+    res.status(500).json({ error: 'Failed to copy expedition requirements' });
+  }
+});
+
 export default router;

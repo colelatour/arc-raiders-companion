@@ -4,7 +4,9 @@
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS favorite_raiders CASCADE;
+DROP TABLE IF EXISTS raider_completed_expedition_items CASCADE;
 DROP TABLE IF EXISTS raider_completed_expedition_parts CASCADE;
+DROP TABLE IF EXISTS expedition_requirements CASCADE;
 DROP TABLE IF EXISTS raider_completed_workbenches CASCADE;
 DROP TABLE IF EXISTS raider_owned_blueprints CASCADE;
 DROP TABLE IF EXISTS raider_completed_quests CASCADE;
@@ -372,6 +374,58 @@ INSERT INTO expedition_parts (id, name, part_number, display_order, created_at) 
 INSERT INTO expedition_parts (id, name, part_number, display_order, created_at) VALUES (5, 'Part 5', 5, 5, '2025-12-09T22:15:49.252Z');
 
 
+-- Table: expedition_requirements
+-- Manages expedition requirements per expedition level
+CREATE TABLE expedition_requirements (
+  id SERIAL PRIMARY KEY,
+  expedition_level INTEGER NOT NULL,
+  part_number INTEGER NOT NULL,
+  item_name VARCHAR(100) NOT NULL,
+  quantity VARCHAR(50) NOT NULL,
+  location VARCHAR(200) NOT NULL,
+  display_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(expedition_level, part_number, item_name)
+);
+CREATE INDEX idx_expedition_requirements_level ON expedition_requirements(expedition_level);
+CREATE INDEX idx_expedition_requirements_part ON expedition_requirements(part_number);
+
+-- Data for expedition_requirements (Expedition 1)
+INSERT INTO expedition_requirements (expedition_level, part_number, item_name, quantity, location, display_order) VALUES
+-- Expedition 1, Part 1
+(1, 1, 'Metal Parts', '150', 'Basic Materials', 1),
+(1, 1, 'Rubber Parts', '200', 'Basic Materials', 2),
+(1, 1, 'ARC Alloy', '80', 'Drones', 3),
+(1, 1, 'Steel Spring', '15', 'Mechanical/Celeste', 4),
+-- Expedition 1, Part 2
+(1, 2, 'Durable Cloth', '35', 'Medical/Commercial', 1),
+(1, 2, 'Wires', '30', 'Electrical/Tech/Celeste', 2),
+(1, 2, 'Electrical Components', '30', 'Electrical/Refiner', 3),
+(1, 2, 'Cooling Fans', '5', 'Technological', 4),
+-- Expedition 1, Part 3
+(1, 3, 'Light Bulb', '5', 'Electrical', 1),
+(1, 3, 'Battery', '30', 'Tech/Electrical/Celeste', 2),
+(1, 3, 'Sensors', '20', 'Security/Tech/Celeste', 3),
+(1, 3, 'Exodus Modules', '1', 'Exodus/Celeste', 4),
+-- Expedition 1, Part 4
+(1, 4, 'Humidifier', '5', 'Residential', 1),
+(1, 4, 'Adv. Electrical Components', '5', 'Electrical/Refiner', 2),
+(1, 4, 'Magnetic Accelerator', '3', 'Exodus', 3),
+(1, 4, 'Leaper Pulse Unit', '3', 'Drones', 4),
+-- Expedition 1, Part 5
+(1, 5, 'Combat Items', '250k Value', 'Turn in items', 1),
+(1, 5, 'Survival Items', '100k Value', 'Turn in items', 2),
+(1, 5, 'Provisions', '180k Value', 'Turn in items', 3),
+(1, 5, 'Materials', '300k Value', 'Turn in items', 4);
+
+-- Data for expedition_requirements (Expedition 2 - same as Expedition 1 for now)
+INSERT INTO expedition_requirements (expedition_level, part_number, item_name, quantity, location, display_order)
+SELECT 2, part_number, item_name, quantity, location, display_order
+FROM expedition_requirements
+WHERE expedition_level = 1;
+
+
 -- Table: quests
 CREATE TABLE quests (
   id INTEGER NOT NULL,
@@ -556,7 +610,7 @@ CREATE TABLE raider_profiles (
   id INTEGER NOT NULL PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   user_id INTEGER NOT NULL,
   raider_name VARCHAR(100) NOT NULL,
-  expedition_level INTEGER DEFAULT 0,
+  expedition_level INTEGER DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   is_active BOOLEAN DEFAULT true,
@@ -622,6 +676,19 @@ CREATE TABLE raider_completed_expedition_parts (
 );
 CREATE UNIQUE INDEX raider_completed_expedition_p_raider_profile_id_expedition__key ON public.raider_completed_expedition_parts USING btree (raider_profile_id, expedition_part_id);
 CREATE INDEX idx_raider_completed_expedition_parts_profile ON public.raider_completed_expedition_parts USING btree (raider_profile_id);
+
+-- Table: raider_completed_expedition_items
+-- Tracks individual materials/items completed for each expedition part
+CREATE TABLE raider_completed_expedition_items (
+  id SERIAL PRIMARY KEY,
+  raider_profile_id INTEGER NOT NULL REFERENCES raider_profiles(id) ON DELETE CASCADE,
+  part_name VARCHAR(50) NOT NULL,
+  item_name VARCHAR(100) NOT NULL,
+  completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(raider_profile_id, part_name, item_name)
+);
+CREATE INDEX idx_raider_expedition_items_profile ON raider_completed_expedition_items(raider_profile_id);
+CREATE INDEX idx_raider_expedition_items_part ON raider_completed_expedition_items(part_name);
 
 -- Table: favorite_raiders
 CREATE TABLE favorite_raiders (
