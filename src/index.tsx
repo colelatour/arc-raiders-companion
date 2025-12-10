@@ -1,8 +1,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { useAuth } from './contexts/AuthContext';
 import { LoginPage } from './components/LoginPage';
+import VerifyEmailPage from './components/VerifyEmailPage';
 import App from './App';
 import { Loader } from 'lucide-react';
 
@@ -20,7 +22,13 @@ const AppWrapper = () => {
     );
   }
 
-  return user ? <App /> : <LoginPage />;
+  return (
+    <Routes>
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/" element={user ? <App /> : <Navigate to="/login" replace />} />
+    </Routes>
+  );
 };
 
 const rootElement = document.getElementById('root');
@@ -30,8 +38,10 @@ const root = createRoot(rootElement);
 
 root.render(
   <React.StrictMode>
-    <AuthProvider>
-      <AppWrapper />
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <AppWrapper />
+      </AuthProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );

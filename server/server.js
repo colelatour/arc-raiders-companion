@@ -13,9 +13,34 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware - CORS must be first!
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? 'https://your-production-url.com' 
-    : 'http://localhost:3002',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In production, only allow specific domain
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [process.env.FRONTEND_URL || 'https://your-production-url.com'];
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(new Error('Not allowed by CORS'));
+    }
+    
+    // In development, allow localhost and local network IPs
+    const allowedPatterns = [
+      /^http:\/\/localhost:\d+$/,
+      /^http:\/\/127\.0\.0\.1:\d+$/,
+      /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+      /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/,
+    ];
+    
+    const isAllowed = allowedPatterns.some(pattern => pattern.test(origin));
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']

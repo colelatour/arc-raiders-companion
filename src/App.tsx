@@ -36,6 +36,7 @@ import { useRaiderProfile } from './hooks/useRaiderProfile';
 import { admin, raider } from './utils/api';
 import { QUESTS, BLUEPRINTS, CRAFTING_ITEMS, SAFE_TO_RECYCLE, SAFE_TO_SELL } from './utils/constants';
 import { ViewState, SafeItem, CraftingItem } from './types/types';
+import TwitterTimeline from './components/TwitterTimeline';
 
 // Add admin and settings to ViewState
 type AppViewState = ViewState | 'admin' | 'settings';
@@ -512,29 +513,12 @@ const HomeView = ({
               @ARCRaidersGame
             </a>
         </div>
-        <div className="bg-arc-800 flex-grow p-6 flex items-center justify-center min-h-[400px]">
-            <div className="text-center space-y-4 max-w-md">
-              <div className="bg-arc-900/50 p-8 rounded-lg border border-arc-700">
-                <Twitter size={48} className="text-[#1DA1F2] mx-auto mb-4" />
-                <h4 className="text-xl font-bold text-white mb-2">Follow for Updates</h4>
-                <p className="text-gray-400 text-sm mb-6">
-                  Get the latest news, updates, and community content from the official ARC Raiders account.
-                </p>
-                <a 
-                  href="https://twitter.com/ARCRaidersGame" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-[#1DA1F2] text-white px-6 py-3 rounded-lg font-bold hover:bg-[#1a8cd8] transition-colors"
-                >
-                  <Twitter size={20} />
-                  View @ARCRaidersGame
-                  <ExternalLink size={16} />
-                </a>
-              </div>
-              <p className="text-xs text-gray-500">
-                Note: Twitter embeds require a public domain. When deployed, the live timeline will appear here.
-              </p>
-            </div>
+        <div className="bg-arc-800 flex-grow">
+            <TwitterTimeline 
+              username="ARCRaidersGame" 
+              tweetLimit={5} 
+              theme="dark" 
+            />
         </div>
       </div>
 

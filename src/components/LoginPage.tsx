@@ -8,12 +8,16 @@ export const LoginPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showResendVerification, setShowResendVerification] = useState(false);
   const { login, register } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccessMessage('');
+    setShowResendVerification(false);
     setIsLoading(true);
 
     try {
@@ -28,16 +32,54 @@ export const LoginPage: React.FC = () => {
         // Register the user but don't auto-login
         await register(email, username, password);
         
-        // Clear form and switch to login
-        setEmail('');
-        setUsername('');
+        // Show success message
+        setSuccessMessage('✅ Registration successful! Please check your email to verify your account.');
         setPassword('');
-        setIsLogin(true);
-        setIsLoading(false);
-        setError('✅ Account created successfully! Please login.');
+        setUsername('');
       }
+      setIsLoading(false);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Authentication failed');
+      const errorMsg = err.response?.data?.error || 'Authentication failed';
+      setError(errorMsg);
+      
+      // Show resend verification option if email not verified
+      if (errorMsg.includes('verify your email')) {
+        setShowResendVerification(true);
+      }
+      
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const response = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to resend verification email');
+      }
+
+      setSuccessMessage('✅ Verification email sent! Please check your inbox.');
+      setShowResendVerification(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to resend verification email');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -98,9 +140,32 @@ export const LoginPage: React.FC = () => {
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
             {error && (
-              <div className={`${error.startsWith('✅') ? 'bg-green-900/20 border-green-700' : 'bg-red-900/20 border-red-700'} border rounded-lg p-4 flex items-start space-x-3 animate-fade-in`}>
-                <AlertTriangle size={20} className={`${error.startsWith('✅') ? 'text-green-500' : 'text-red-500'} flex-shrink-0 mt-0.5`} />
-                <p className={`${error.startsWith('✅') ? 'text-green-300' : 'text-red-300'} text-sm`}>{error}</p>
+              <div className="bg-red-900/20 border-red-700 border rounded-lg p-4 flex items-start space-x-3 animate-fade-in">
+                <AlertTriangle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-red-300 text-sm">{error}</p>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="bg-green-900/20 border-green-700 border rounded-lg p-4 flex items-start space-x-3 animate-fade-in">
+                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-green-300 text-sm">{successMessage}</p>
+              </div>
+            )}
+
+            {showResendVerification && (
+              <div className="bg-blue-900/20 border-blue-700 border rounded-lg p-4 animate-fade-in">
+                <p className="text-blue-300 text-sm mb-3">Haven't received the verification email?</p>
+                <button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={isLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Resend Verification Email
+                </button>
               </div>
             )}
 
