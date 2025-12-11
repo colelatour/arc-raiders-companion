@@ -29,9 +29,13 @@ import {
   Star,
   Wrench,
   Package,
-  UserCog
+  UserCog,
+  Eye,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { useAuth } from './contexts/AuthContext';
+import { useTheme } from './contexts/ThemeContext';
 import { useRaiderProfile } from './hooks/useRaiderProfile';
 import { admin, raider } from './utils/api';
 import { QUESTS, BLUEPRINTS, CRAFTING_ITEMS, SAFE_TO_RECYCLE, SAFE_TO_SELL } from './utils/constants';
@@ -996,20 +1000,20 @@ const WorkbenchesView = ({
                             <div className="space-y-2">
                               <p className="text-xs text-gray-500 uppercase font-bold">Materials Required:</p>
                               <div className="overflow-x-auto">
-                                <table className="w-full">
+                                <table className="w-full table-fixed">
                                   <thead className="bg-arc-900/70">
                                     <tr>
-                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold">Item</th>
-                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold">Quantity</th>
-                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold">Location</th>
+                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold w-2/5">Item</th>
+                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold w-1/5">Quantity</th>
+                                      <th className="text-left p-2 text-xs uppercase text-gray-500 font-bold w-2/5">Location</th>
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {materials.map((mat, idx) => (
                                       <tr key={idx} className="border-t border-arc-700/50">
-                                        <td className="p-2 text-sm text-white">{mat.item}</td>
+                                        <td className="p-2 text-sm text-white truncate">{mat.item}</td>
                                         <td className="p-2 text-sm text-arc-accent font-mono">{mat.quantity}</td>
-                                        <td className="p-2 text-sm text-gray-400">{mat.location}</td>
+                                        <td className="p-2 text-sm text-gray-400 truncate">{mat.location}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -2929,6 +2933,7 @@ const UserManager = () => {
 // --- Settings View ---
 const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
   const { user, logout, setUser } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [newUsername, setNewUsername] = useState(user?.username || '');
   const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
   const [showResetModal, setShowResetModal] = useState(false);
@@ -3040,6 +3045,38 @@ const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
   return (
     <div className="space-y-6 animate-fade-in">
       <SectionHeader title="Account Settings" description="Manage your account preferences" />
+
+      {/* Theme Toggle */}
+      <div className="bg-arc-800 rounded-xl p-6 border border-arc-700 shadow-xl">
+        <div className="flex items-center gap-3 mb-4">
+          {theme === 'dark' ? <Moon size={24} className="text-arc-accent" /> : <Sun size={24} className="text-arc-accent" />}
+          <h3 className="text-xl font-black text-white">Appearance</h3>
+        </div>
+        <p className="text-gray-400 text-sm mb-4">
+          Toggle between light and dark mode to customize your experience.
+        </p>
+        <div className="flex items-center justify-between bg-arc-900/50 rounded-lg p-4 border border-arc-700">
+          <div className="flex items-center gap-3">
+            {theme === 'dark' ? <Moon size={20} className="text-blue-400" /> : <Sun size={20} className="text-yellow-400" />}
+            <div>
+              <div className="text-white font-bold">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</div>
+              <div className="text-xs text-gray-500">Current theme</div>
+            </div>
+          </div>
+          <button
+            onClick={toggleTheme}
+            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+              theme === 'dark' ? 'bg-blue-600' : 'bg-yellow-500'
+            }`}
+          >
+            <span
+              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                theme === 'dark' ? 'translate-x-1' : 'translate-x-7'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
       {/* Reset Confirmation Modal */}
       {showResetModal && (
@@ -3697,8 +3734,10 @@ export default function App() {
   const { profileData, isLoading, toggleQuest, toggleBlueprint, toggleWorkbench, toggleExpeditionPart, toggleExpeditionItem, completeExpedition, refresh } = useRaiderProfile();
   const [currentView, setCurrentView] = useState<AppViewState>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [viewAsUser, setViewAsUser] = useState(false);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'manager';
+  const showAdminFeatures = isAdmin && !viewAsUser;
 
   const navigate = (view: AppViewState) => {
     setCurrentView(view);
@@ -3755,7 +3794,7 @@ export default function App() {
             <SidebarItem icon={Package} label="Expedition" isActive={currentView === 'expedition-parts'} onClick={() => navigate('expedition-parts')} />
             <SidebarItem icon={Trash2} label="Safe Items" isActive={currentView === 'safe-items'} onClick={() => navigate('safe-items')} />
             <SidebarItem icon={Users} label="Raider Search" isActive={currentView === 'raider-search'} onClick={() => navigate('raider-search')} />
-            {isAdmin && (
+            {showAdminFeatures && (
               <SidebarItem icon={Settings} label="Database Manager" isActive={currentView === 'admin'} onClick={() => navigate('admin')} />
             )}
           </nav>
@@ -3772,6 +3811,20 @@ export default function App() {
                 <div className="text-[10px] text-arc-gold font-mono tracking-wider mt-0.5">Expedition {profileData?.expeditionLevel || 0}</div>
               </div>
             </div>
+            
+            {isAdmin && (
+              <button
+                onClick={() => setViewAsUser(!viewAsUser)}
+                className={`w-full flex items-center justify-center space-x-2 px-3 py-2 rounded border transition-colors text-sm font-bold ${
+                  viewAsUser 
+                    ? 'bg-blue-900/30 text-blue-400 border-blue-900 hover:bg-blue-900/50' 
+                    : 'bg-arc-900 text-gray-400 border-arc-700 hover:bg-arc-800 hover:text-white hover:border-arc-accent'
+                }`}
+              >
+                <Eye size={14} />
+                <span>{viewAsUser ? 'VIEWING AS USER' : 'VIEW AS USER'}</span>
+              </button>
+            )}
             
             <button
               onClick={() => navigate('settings')}
@@ -3809,7 +3862,7 @@ export default function App() {
           {currentView === 'safe-items' && <SafeItemsView />}
           {currentView === 'raider-search' && <RaiderSearchView />}
           {currentView === 'settings' && <SettingsView onRefresh={refresh} />}
-          {currentView === 'admin' && isAdmin && <AdminView />}
+          {currentView === 'admin' && showAdminFeatures && <AdminView />}
         </div>
       </div>
     </div>

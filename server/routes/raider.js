@@ -899,6 +899,27 @@ router.put('/settings/password', async (req, res) => {
   }
 });
 
+// Update user theme preference
+router.put('/settings/theme', async (req, res) => {
+  const { theme } = req.body;
+
+  try {
+    if (!theme || (theme !== 'light' && theme !== 'dark')) {
+      return res.status(400).json({ error: 'Invalid theme. Must be "light" or "dark"' });
+    }
+
+    await pool.query(
+      'UPDATE users SET theme = $1 WHERE id = $2',
+      [theme, req.user.userId]
+    );
+
+    res.json({ message: 'Theme updated successfully', theme });
+  } catch (error) {
+    console.error('Error updating theme:', error);
+    res.status(500).json({ error: 'Failed to update theme' });
+  }
+});
+
 // Reset account (wipe all progress, back to expedition 0)
 router.post('/settings/reset', async (req, res) => {
   console.log('🔄 Reset account request received from user:', req.user.userId);
