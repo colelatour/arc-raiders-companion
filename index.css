@@ -1,0 +1,282 @@
+/* Light theme variables */
+.light {
+  --arc-900: #f8fafc;
+  --arc-800: #ffffff;
+  --arc-700: #e2e8f0;
+  --arc-600: #cbd5e1;
+  --arc-500: #94a3b8;
+  --arc-accent: #dc2626;
+  --arc-gold: #f59e0b;
+}
+
+/* Light theme overrides */
+.light body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Background colors */
+.light .bg-arc-900 {
+  background-color: #f8fafc !important;
+}
+
+.light .bg-arc-800 {
+  background-color: #ffffff !important;
+}
+
+.light .bg-arc-700 {
+  background-color: #f1f5f9 !important;
+}
+
+.light .bg-arc-600 {
+  background-color: #e2e8f0 !important;
+}
+
+.light .bg-arc-900\/95 {
+  background-color: rgba(248, 250, 252, 0.95) !important;
+}
+
+.light .bg-arc-900\/80 {
+  background-color: rgba(248, 250, 252, 0.8) !important;
+}
+
+.light .bg-arc-900\/50 {
+  background-color: rgba(248, 250, 252, 0.5) !important;
+}
+
+.light .bg-arc-800\/50 {
+  background-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+/* Border colors */
+.light .border-arc-700 {
+  border-color: #cbd5e1 !important;
+}
+
+.light .border-arc-600 {
+  border-color: #94a3b8 !important;
+}
+
+/* Text colors */
+.light .text-white {
+  color: #0f172a !important;
+}
+
+.light .text-gray-100 {
+  color: #1e293b !important;
+}
+
+.light .text-gray-200 {
+  color: #334155 !important;
+}
+
+.light .text-gray-300 {
+  color: #475569 !important;
+}
+
+.light .text-gray-400 {
+  color: #64748b !important;
+}
+
+.light .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+.light .text-gray-600 {
+  color: #475569 !important;
+}
+
+/* Hover states */
+.light .hover\:text-white:hover {
+  color: #0f172a !important;
+}
+
+.light .hover\:bg-arc-800:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.light .hover\:bg-arc-700:hover {
+  background-color: #e2e8f0 !important;
+}
+
+.light .hover\:bg-gray-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+/* Focus states */
+.light .focus\:border-arc-accent:focus {
+  border-color: #dc2626 !important;
+}
+
+/* Special backgrounds for contrast */
+.light .bg-red-900\/30 {
+  background-color: rgba(220, 38, 38, 0.1) !important;
+}
+
+.light .bg-red-900\/50 {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+}
+
+.light .bg-blue-900\/30 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+.light .bg-blue-900\/50 {
+  background-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+.light .bg-green-900\/30 {
+  background-color: rgba(34, 197, 94, 0.1) !important;
+}
+
+.light .bg-yellow-900\/30 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+}
+
+.light .bg-gray-900\/30 {
+  background-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+/* Accent gold backgrounds */
+.light .bg-arc-gold\/20 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+.light .bg-arc-gold\/30 {
+  background-color: rgba(245, 158, 11, 0.2) !important;
+}
+
+/* Border colors for special elements */
+.light .border-red-900 {
+  border-color: #dc2626 !important;
+}
+
+.light .border-red-900\/30 {
+  border-color: rgba(220, 38, 38, 0.3) !important;
+}
+
+.light .border-red-900\/50 {
+  border-color: rgba(220, 38, 38, 0.5) !important;
+}
+
+.light .border-blue-900 {
+  border-color: #2563eb !important;
+}
+
+.light .border-red-700 {
+  border-color: #dc2626 !important;
+}
+
+.light .border-red-600 {
+  border-color: #dc2626 !important;
+}
+
+.light .border-gray-600 {
+  border-color: #94a3b8 !important;
+}
+
+/* Text colors for special elements */
+.light .text-red-400 {
+  color: #dc2626 !important;
+}
+
+.light .text-red-200 {
+  color: #dc2626 !important;
+}
+
+.light .text-red-500 {
+  color: #dc2626 !important;
+}
+
+.light .text-blue-400 {
+  color: #2563eb !important;
+}
+
+.light .text-green-400 {
+  color: #16a34a !important;
+}
+
+.light .text-yellow-500 {
+  color: #f59e0b !important;
+}
+
+.light .text-arc-gold {
+  color: #d97706 !important;
+}
+
+.light .text-arc-accent {
+  color: #dc2626 !important;
+}
+
+/* Hover text colors */
+.light .hover\:text-red-300:hover {
+  color: #b91c1c !important;
+}
+
+.light .hover\:text-red-400:hover {
+  color: #b91c1c !important;
+}
+
+.light .hover\:underline:hover {
+  text-decoration: underline !important;
+}
+
+/* Scrollbar for light mode */
+.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Shadow colors */
+.light .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08) !important;
+}
+
+.light .shadow-red-900\/40 {
+  box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.2), 0 4px 6px -4px rgba(220, 38, 38, 0.2) !important;
+}
+
+.light .shadow-red-900\/50 {
+  box-shadow: 0 20px 25px -5px rgba(220, 38, 38, 0.25), 0 8px 10px -6px rgba(220, 38, 38, 0.25) !important;
+}
+
+/* Input fields */
+.light input,
+.light select,
+.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light input:focus,
+.light select:focus,
+.light textarea:focus {
+  border-color: #dc2626 !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Disabled states */
+.light input:disabled,
+.light select:disabled,
+.light textarea:disabled,
+.light button:disabled {
+  background-color: #f1f5f9 !important;
+  color: #94a3b8 !important;
+}
+

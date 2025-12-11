@@ -107,6 +107,9 @@ export const raider = {
   updatePassword: (currentPassword: string, newPassword: string) =>
     api.put('/raider/settings/password', { currentPassword, newPassword }),
   
+  updateTheme: (theme: 'light' | 'dark') =>
+    api.put('/raider/settings/theme', { theme }),
+  
   resetAccount: () =>
     api.post('/raider/settings/reset'),
   

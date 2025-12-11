@@ -126,7 +126,8 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         username: user.username,
-        role: user.role || 'user'
+        role: user.role || 'user',
+        theme: user.theme || 'dark'
       }
     });
 
@@ -149,7 +150,7 @@ router.get('/verify', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const result = await pool.query(
-      'SELECT id, email, username, role FROM users WHERE id = $1 AND is_active = true',
+      'SELECT id, email, username, role, theme FROM users WHERE id = $1 AND is_active = true',
       [decoded.userId]
     );
 
@@ -157,7 +158,16 @@ router.get('/verify', async (req, res) => {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    res.json({ user: result.rows[0] });
+    const user = result.rows[0];
+    res.json({ 
+      user: {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        theme: user.theme || 'dark'
+      }
+    });
 
   } catch (error) {
     res.status(403).json({ error: 'Invalid token' });

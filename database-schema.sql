@@ -1,7 +1,7 @@
 -- ARC Raiders Companion Database Schema with Data
 -- Generated: 2025-12-10T21:44:29.837Z
 -- PostgreSQL Database Schema and Data Dump
--- Updated: Added email verification fields
+-- Updated: Added email verification fields and theme preference
 
 -- Drop existing tables if they exist
 DROP TABLE IF EXISTS favorite_raiders CASCADE;
@@ -37,6 +37,7 @@ CREATE TABLE users (
   email_verified BOOLEAN DEFAULT false,
   verification_token VARCHAR(255),
   verification_token_expires TIMESTAMP,
+  theme VARCHAR(10) DEFAULT 'dark',
   UNIQUE (email),
   UNIQUE (username)
 );
@@ -46,6 +47,7 @@ CREATE INDEX idx_users_email ON public.users USING btree (email);
 CREATE INDEX idx_users_username ON public.users USING btree (username);
 CREATE INDEX idx_users_role ON public.users USING btree (role);
 CREATE INDEX idx_users_verification_token ON public.users USING btree (verification_token);
+CREATE INDEX idx_users_theme ON public.users USING btree (theme);
 
 -- Default Admin User
 -- Email: admin@arcraiders.com
