@@ -33,7 +33,7 @@ class DatabaseAdapter {
   }
 
   async initializeSQLite() {
-    const Database = (await import('better-sqlite3')).default;
+    const Database = (await import('better-' + 'sqlite3')).default;
     const dbPath = process.env.SQLITE_DB_PATH || './arc_raiders.db';
     
     this.db = new Database(dbPath);
@@ -43,7 +43,7 @@ class DatabaseAdapter {
   }
 
   async initializePostgres() {
-    const pg = await import('pg');
+    const pg = await import('p' + 'g');
     const { Pool } = pg.default;
 
     const poolConfig = process.env.DATABASE_URL

@@ -3,7 +3,7 @@ main = "server/worker.js"
 compatibility_date = "2024-01-01"
 
 # Node.js compatibility for imports
-node_compat = true
+nodejs_compat = true
 
 # Mark Node.js-specific modules as external (not bundled)
 [build]
