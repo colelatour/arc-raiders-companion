@@ -60,6 +60,11 @@ export function createServer(env) {
   app.use('/api/raider', raiderRoutes);
   app.use('/api/admin', adminRoutes);
 
+  // Respond to favicon requests with no content to avoid asset 500s when no favicon is uploaded
+  app.get('/favicon.ico', (req, res) => {
+    res.status(204).send('');
+  });
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'ARC Raiders API is running on Cloudflare' });
   });
@@ -111,18 +116,32 @@ export function createServer(env) {
                 
                 const handlers = layer.handle.stack || [layer.handle];
                 
-                const run = (index = 0) => {
+                const run = async (index = 0) => {
                   if (index >= handlers.length) return resolve();
                   try {
-                    handlers[index](req, res, (err) => {
+                    const ret = handlers[index](req, res, (err) => {
                       if (err) reject(err);
                       else run(index + 1);
                     });
+
+                    // If middleware returned a Promise (e.g., authenticateToken), await it
+                    if (ret && typeof ret.then === 'function') {
+                      const result = await ret;
+                      // If middleware signals to stop by returning false, resolve the chain
+                      if (result === false) return resolve();
+                      // Otherwise continue to next handler
+                      return run(index + 1);
+                    }
+
+                    // If the handler does not accept a next callback (length < 3), assume it handled the response and continue
+                    if (typeof handlers[index] === 'function' && handlers[index].length < 3) {
+                      return run(index + 1);
+                    }
                   } catch (e) {
                     reject(e);
                   }
                 };
-                
+
                 run();
               });
 
