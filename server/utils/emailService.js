@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 // Create transporter
 const createTransporter = () => {

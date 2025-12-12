@@ -1117,18 +1117,36 @@ router.get('/expedition-requirements', async (req, res) => {
 
 // Get a random raider tip
 router.get('/tips/random', async (req, res) => {
+  const tips = [
+    "Use the \"Free Loadout\" when starting out or learning a map—no risk if you die.",
+    "Upgrade stamina/mobility early to improve survivability.",
+    "Use the Safe Pocket for valuable loot or keys.",
+    "Don't rush fights; survival matters more than kills.",
+    "Focus on exploration and map learning early.",
+    "Sound is critical—footsteps and looting noises give away position.",
+    "Crouch-walk and reduce noise whenever possible.",
+    "After fights, stop and listen before looting.",
+    "Craft custom loadouts once stable.",
+    "Prioritize high-value loot over junk.",
+    "Use crafting benches for weapon/equipment improvements.",
+    "Bring utility items like grenades and smokes.",
+    "Use cover and high ground; positioning beats aim.",
+    "Learn alternate routes to avoid ambushes.",
+    "Master map knowledge: ARC patrols, loot, extraction points.",
+    "Extraction points are loud and risky—scout first.",
+    "Raider Hatch Keys offer quiet extraction options.",
+    "Even while downed, extraction may still be possible.",
+    "Extracting with decent loot is better than dying with rare loot.",
+    "Choose fights wisely—avoid unnecessary engagements.",
+    "Use weapons effective against armored ARC enemies.",
+    "Melee weak AI enemies to conserve ammo and reduce noise.",
+    "Use tactical gear proactively.",
+    "Solo is viable with cautious play: awareness, retreating, early extracts.",
+    "Don't let gear-fear stop you—deaths are learning moments.",
+    "Practice in low-stakes runs before bringing valuable gear."
+  ];
+
   try {
-    const fs = await import('fs/promises');
-    const path = await import('path');
-    const { fileURLToPath } = await import('url');
-    
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const tipsPath = path.join(__dirname, '..', 'raider-tips.txt');
-    
-    const fileContent = await fs.readFile(tipsPath, 'utf-8');
-    const tips = fileContent.split('\n').filter(line => line.trim() !== '');
-    
     if (tips.length === 0) {
       return res.json({ tip: 'Stay alert, Raider!' });
     }
