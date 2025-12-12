@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 import pool from '../database.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail } from '../utils/emailService.js';
 
-const router = express.Router();
 
 const routes = [
   {
