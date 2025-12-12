@@ -62,7 +62,7 @@ export const LoginPage: React.FC = () => {
     setSuccessMessage('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+      const API_URL = import.meta.env.VITE_API_URL || '/api';
       const response = await fetch(`${API_URL}/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -170,10 +170,12 @@ export const LoginPage: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              <label htmlFor="login-email" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
                 Email
               </label>
               <input
+                id="login-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -185,10 +187,12 @@ export const LoginPage: React.FC = () => {
 
             {!isLogin && (
               <div className="animate-fade-in">
-                <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+                <label htmlFor="login-username" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
                   Username
                 </label>
                 <input
+                  id="login-username"
+                  name="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -200,10 +204,12 @@ export const LoginPage: React.FC = () => {
             )}
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
+              <label htmlFor="login-password" className="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">
                 Password
               </label>
               <input
+                id="login-password"
+                name="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

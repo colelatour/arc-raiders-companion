@@ -119,7 +119,7 @@ const routes = [
         // Generate JWT
         const token = jwt.sign(
           { userId: user.id, email: user.email, username: user.username, role: user.role || 'user' },
-          process.env.JWT_SECRET,
+          (typeof process !== 'undefined' && process.env && process.env.JWT_SECRET) || (req && req.env && req.env.JWT_SECRET),
           { expiresIn: '7d' }
         );
 
@@ -153,7 +153,7 @@ const routes = [
       }
 
       try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, (typeof process !== 'undefined' && process.env && process.env.JWT_SECRET) || (req && req.env && req.env.JWT_SECRET));
         
         const result = await pool.query(
           'SELECT id, email, username, role, theme FROM users WHERE id = $1 AND is_active = true',

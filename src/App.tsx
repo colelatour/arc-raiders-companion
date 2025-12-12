@@ -638,6 +638,8 @@ const QuestsView = ({
       <div className="relative">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
         <input
+          name="quest-search"
+          aria-label="Search quests"
           type="text"
           placeholder="Search quests by name, location, or objective..."
           value={searchQuery}
@@ -783,6 +785,8 @@ const BlueprintsView = ({
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
           <input
+            name="blueprint-search"
+            aria-label="Search blueprints"
             type="text"
             placeholder="Search blueprints..."
             value={searchQuery}
@@ -929,6 +933,8 @@ const WorkbenchesView = ({
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
           <input
+            name="workbench-search"
+            aria-label="Search workbenches"
             type="text"
             placeholder="Search workbenches..."
             value={searchQuery}
@@ -1263,6 +1269,8 @@ const SafeItemsView = () => {
         <div className="relative">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
           <input
+            name="safeitem-search"
+            aria-label="Search items"
             type="text"
             placeholder="Search items..."
             value={searchQuery}
@@ -2758,6 +2766,8 @@ const UserManager = () => {
       <div className="relative">
         <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
         <input
+          name="user-search"
+          aria-label="Search users"
           type="text"
           placeholder="Search users by username, email, or ID..."
           value={searchQuery}
@@ -2773,8 +2783,10 @@ const UserManager = () => {
             <h3 className="text-2xl font-bold text-white mb-6">Add New User</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Email *</label>
+                <label htmlFor="admin-user-email" className="block text-sm text-gray-400 mb-1">Email *</label>
                 <input
+                  id="admin-user-email"
+                  name="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -2784,8 +2796,10 @@ const UserManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Username *</label>
+                <label htmlFor="admin-user-username" className="block text-sm text-gray-400 mb-1">Username *</label>
                 <input
+                  id="admin-user-username"
+                  name="username"
                   type="text"
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value })}
@@ -2796,8 +2810,10 @@ const UserManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Password *</label>
+                <label htmlFor="admin-user-password" className="block text-sm text-gray-400 mb-1">Password *</label>
                 <input
+                  id="admin-user-password"
+                  name="password"
                   type="password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
@@ -2809,8 +2825,10 @@ const UserManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Role *</label>
+                <label htmlFor="admin-user-role" className="block text-sm text-gray-400 mb-1">Role *</label>
                 <select
+                  id="admin-user-role"
+                  name="role"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   className="w-full bg-arc-800 text-white px-3 py-2 rounded border border-arc-700 focus:border-arc-accent focus:outline-none"
@@ -3183,8 +3201,10 @@ const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
             </div>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">New Username</label>
+            <label htmlFor="settings-new-username" className="block text-sm text-gray-400 mb-2">New Username</label>
             <input
+              id="settings-new-username"
+              name="newUsername"
               type="text"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
@@ -3226,8 +3246,10 @@ const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
         </p>
         <form onSubmit={handleChangePassword} className="space-y-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Current Password</label>
+            <label htmlFor="settings-current-password" className="block text-sm text-gray-400 mb-2">Current Password</label>
             <input
+              id="settings-current-password"
+              name="currentPassword"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -3237,8 +3259,10 @@ const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">New Password</label>
+            <label htmlFor="settings-new-password" className="block text-sm text-gray-400 mb-2">New Password</label>
             <input
+              id="settings-new-password"
+              name="newPassword"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -3250,8 +3274,10 @@ const SettingsView = ({ onRefresh }: { onRefresh: () => Promise<void> }) => {
             <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
+            <label htmlFor="settings-confirm-password" className="block text-sm text-gray-400 mb-2">Confirm New Password</label>
             <input
+              id="settings-confirm-password"
+              name="confirmPassword"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -3484,8 +3510,10 @@ const ExpeditionRequirementsManager = () => {
         <SectionHeader title="Expedition Requirements Manager" description="Configure expedition requirements for each level" />
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-400 font-bold">Expedition Level:</label>
+            <label htmlFor="expedition-level" className="text-sm text-gray-400 font-bold">Expedition Level:</label>
             <input
+              id="expedition-level"
+              name="selectedLevel"
               type="number"
               min="1"
               value={selectedLevel}
@@ -3511,8 +3539,10 @@ const ExpeditionRequirementsManager = () => {
             </h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Item Name *</label>
+                <label htmlFor="requirement-item-name" className="block text-sm text-gray-400 mb-1">Item Name *</label>
                 <input
+                  id="requirement-item-name"
+                  name="item_name"
                   type="text"
                   value={formData.item_name}
                   onChange={(e) => setFormData({ ...formData, item_name: e.target.value })}
@@ -3523,8 +3553,10 @@ const ExpeditionRequirementsManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Quantity *</label>
+                <label htmlFor="requirement-quantity" className="block text-sm text-gray-400 mb-1">Quantity *</label>
                 <input
+                  id="requirement-quantity"
+                  name="quantity"
                   type="text"
                   value={formData.quantity}
                   onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
@@ -3535,8 +3567,10 @@ const ExpeditionRequirementsManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Location *</label>
+                <label htmlFor="requirement-location" className="block text-sm text-gray-400 mb-1">Location *</label>
                 <input
+                  id="requirement-location"
+                  name="location"
                   type="text"
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
@@ -3547,8 +3581,10 @@ const ExpeditionRequirementsManager = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Display Order</label>
+                <label htmlFor="requirement-display-order" className="block text-sm text-gray-400 mb-1">Display Order</label>
                 <input
+                  id="requirement-display-order"
+                  name="display_order"
                   type="number"
                   value={formData.display_order}
                   onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}

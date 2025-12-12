@@ -79,7 +79,8 @@ export function createServer(env) {
         url: request.url,
         headers: request.headers,
         body: reqBody,
-        originalRequest: request
+        originalRequest: request,
+        env // expose worker env to handlers
       };
       
       const res = {

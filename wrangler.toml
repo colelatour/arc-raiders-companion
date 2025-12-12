@@ -26,7 +26,8 @@ database_id = "9262edba-70da-4017-b02c-15495e41fb9e"
 [vars]
 NODE_ENV = "production"
 JWT_SECRET = "arccompanionapi"
-FRONTEND_URL = "https://arccompanion.5tourstudios.com"
+FRONTEND_URL = "https://arc-raiders-companion.dlatour.workers.dev"
+VITE_API_URL = "https://arc-raiders-companion.dlatour.workers.dev/api"
 APP_VERSION = "1"
 
 # For email service, use Cloudflare Email Routing or external SMTP

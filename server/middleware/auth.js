@@ -27,7 +27,7 @@ export const authenticateToken = (req, res, next) => {
   }
 
   const verify = () => new Promise((resolve) => {
-    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    jwt.verify(token, (typeof process !== 'undefined' && process.env && process.env.JWT_SECRET) || (req && req.env && req.env.JWT_SECRET), (err, user) => {
       if (err) {
         if (isExpress) res.status(403).json({ error: 'Invalid or expired token' });
         else res.status(403).json({ error: 'Invalid or expired token' });
