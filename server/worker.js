@@ -11,7 +11,7 @@
  * 4. Deploy: wrangler deploy
  */
 
-import { createServer } from './server/server-cloudflare.js';
+import { createServer } from './server-cloudflare.js';
 
 export default {
   async fetch(request, env, ctx) {
