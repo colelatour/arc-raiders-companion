@@ -43,7 +43,13 @@ class DatabaseAdapter {
   }
 
   async initializePostgres() {
-    const pg = await import('p' + 'g');
+    // Only run Postgres initialization in Node.js (local) environments.
+    if (typeof process === 'undefined') {
+      throw new Error('Postgres initialization is not supported in Cloudflare Workers.');
+    }
+
+    // Use eval to avoid bundlers statically resolving the 'pg' module during worker builds
+    const pg = await eval("import('pg')");
     const { Pool } = pg.default;
 
     const poolConfig = process.env.DATABASE_URL
