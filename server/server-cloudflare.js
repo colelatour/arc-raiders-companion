@@ -119,22 +119,30 @@ export function createServer(env) {
                 const run = async (index = 0) => {
                   if (index >= handlers.length) return resolve();
                   try {
-                    const ret = handlers[index](req, res, (err) => {
-                      if (err) reject(err);
-                      else run(index + 1);
-                    });
+                    let ret;
+                    if (typeof handlers[index] === 'function' && handlers[index].length >= 3) {
+                      // Express-style middleware (req, res, next)
+                      ret = handlers[index](req, res, (err) => {
+                        if (err) reject(err);
+                        else run(index + 1);
+                      });
 
-                    // If middleware returned a Promise (e.g., authenticateToken), await it
-                    if (ret && typeof ret.then === 'function') {
-                      const result = await ret;
-                      // If middleware signals to stop by returning false, resolve the chain
-                      if (result === false) return resolve();
-                      // Otherwise continue to next handler
-                      return run(index + 1);
-                    }
+                      // If middleware returned a Promise, await it (but don't advance here; next() controls flow)
+                      if (ret && typeof ret.then === 'function') {
+                        const result = await ret;
+                        if (result === false) return resolve();
+                      }
+                    } else {
+                      // Worker-style middleware/handler (req, res) => maybe Promise or boolean
+                      ret = handlers[index](req, res);
 
-                    // If the handler does not accept a next callback (length < 3), assume it handled the response and continue
-                    if (typeof handlers[index] === 'function' && handlers[index].length < 3) {
+                      if (ret && typeof ret.then === 'function') {
+                        const result = await ret;
+                        if (result === false) return resolve();
+                        return run(index + 1);
+                      }
+
+                      // Synchronous handler; continue
                       return run(index + 1);
                     }
                   } catch (e) {

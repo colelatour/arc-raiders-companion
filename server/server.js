@@ -51,10 +51,72 @@ app.options('*', cors());
 
 app.use(express.json());
 
+// Helper to mount either an Express Router or the worker-style routes array
+function mountRoutes(prefix, routesModule) {
+  if (!routesModule) return;
+  // If it's an Express Router or middleware function, mount directly
+  if (typeof routesModule === 'function' || (typeof routesModule === 'object' && routesModule.stack)) {
+    app.use(prefix, routesModule);
+    return;
+  }
+  // If it's an array of route descriptors (worker format), convert to Router
+  if (Array.isArray(routesModule)) {
+    const router = express.Router();
+    routesModule.forEach(route => {
+      const method = (route.method || 'get').toLowerCase();
+      let handler = route.handler;
+      const middlewares = [];
+
+      if (handler && handler.stack && Array.isArray(handler.stack)) {
+        handler.stack.forEach(m => {
+          if (typeof m === 'function') {
+            // If function expects (req,res) only, wrap it for Express
+            if (m.length < 3) {
+              middlewares.push((req, res, next) => {
+                try {
+                  const ret = m(req, res);
+                  Promise.resolve(ret).then(ok => {
+                    if (ok === false) return; // middleware signaled halt
+                    next();
+                  }).catch(next);
+                } catch (err) { next(err); }
+              });
+            } else {
+              middlewares.push(m);
+            }
+          }
+        });
+      } else if (typeof handler === 'function') {
+        if (handler.length < 3) {
+          middlewares.push((req, res, next) => {
+            try {
+              const ret = handler(req, res);
+              Promise.resolve(ret).then(ok => {
+                if (ok === false) return;
+                next();
+              }).catch(next);
+            } catch (err) { next(err); }
+          });
+        } else {
+          middlewares.push(handler);
+        }
+      }
+
+      if (typeof router[method] === 'function') {
+        router[method](route.path, ...middlewares);
+      }
+    });
+    app.use(prefix, router);
+  } else {
+    // Fallback
+    app.use(prefix, routesModule);
+  }
+}
+
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/raider', raiderRoutes);
-app.use('/api/admin', adminRoutes);
+mountRoutes('/api/auth', authRoutes);
+mountRoutes('/api/raider', raiderRoutes);
+mountRoutes('/api/admin', adminRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
