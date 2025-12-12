@@ -66,6 +66,7 @@
     <script>
       (function(){
         try {
+          // Cleanup any local dev overrides
           var ip = '192.168.';
           var keys = Object.keys(localStorage || {});
           for (var i = 0; i < keys.length; i++){
@@ -82,6 +83,45 @@
           if (window.caches && caches.keys) {
             caches.keys().then(function(names){ names.forEach(function(n){ caches.delete(n); }); });
           }
+
+          // Defensive runtime rewrite: any absolute http://.../api/* calls will be rewritten to the current origin
+          function rewriteUrl(u) {
+            try {
+              if (typeof u !== 'string') return u;
+              if (u.indexOf('http://') === 0) {
+                var apiIndex = u.indexOf('/api');
+                if (apiIndex !== -1) {
+                  return window.location.origin + u.slice(apiIndex);
+                }
+              }
+            } catch (e) { /* ignore */ }
+            return u;
+          }
+
+          // Patch XMLHttpRequest.open
+          (function(){
+            var X = window.XMLHttpRequest;
+            var origOpen = X.prototype.open;
+            X.prototype.open = function(method, url) {
+              try { arguments[1] = rewriteUrl(url); } catch(e){}
+              return origOpen.apply(this, arguments);
+            };
+          })();
+
+          // Patch fetch
+          (function(){
+            if (window.fetch) {
+              var origFetch = window.fetch.bind(window);
+              window.fetch = function(input, init) {
+                try {
+                  if (typeof input === 'string') input = rewriteUrl(input);
+                  else if (input && input.url) input = new Request(rewriteUrl(input.url), input);
+                } catch(e){}
+                return origFetch(input, init);
+              };
+            }
+          })();
+
         } catch(e) { console.error('Client cleanup error', e); }
       })();
     </script>
