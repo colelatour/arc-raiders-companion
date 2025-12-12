@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { sign, verify } from 'hono/jwt';
+import { sign, verify } from '../utils/jwt.js';
 import { hashPassword, comparePassword } from '../utils/crypto.js';
 import dbAdapter from '../database.js';
 
