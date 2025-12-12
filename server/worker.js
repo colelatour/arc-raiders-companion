@@ -1,24 +1,26 @@
-/**
- * Cloudflare Worker for ARC Raiders Companion API
- * 
- * This worker integrates with Cloudflare D1 database
- * and serves as the production API endpoint.
- * 
- * Setup:
- * 1. Create a D1 database: wrangler d1 create arc-raiders-db
- * 2. Run migrations: wrangler d1 execute arc-raiders-db --file=./migrations/schema.sql
- * 3. Update wrangler.toml with your D1 database ID
- * 4. Deploy: wrangler deploy
- */
+import { Hono } from 'hono';
+import { DatabaseAdapter } from './database-adapter.js';
+import auth from './routes/auth-worker.js';
+import raider from './routes/raider-worker.js';
+import admin from './routes/admin-worker.js';
 
-import { createServer } from './server-cloudflare.js';
+const app = new Hono();
+const dbAdapter = new DatabaseAdapter();
 
-export default {
-  async fetch(request, env, ctx) {
-    // Get the Express-like app with D1 database binding
-    const app = createServer(env);
-    
-    // Handle the request
-    return await app.handleRequest(request, env, ctx);
+// Middleware to initialize database
+app.use('*', async (c, next) => {
+  if (!dbAdapter.initialized) {
+    dbAdapter.setD1Database(c.env.DB);
   }
-};
+  await next();
+});
+
+app.get('/api/health', (c) => {
+  return c.json({ status: 'ok', message: 'ARC Raiders API is running' });
+});
+
+app.route('/api/auth', auth);
+app.route('/api/raider', raider);
+app.route('/api/admin', admin);
+
+export default app;
