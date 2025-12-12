@@ -1,6 +1,3 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 /**
  * Database Adapter - Unified interface for SQLite/D1 and PostgreSQL
  * 
@@ -10,7 +7,10 @@ dotenv.config();
 
 class DatabaseAdapter {
   constructor() {
-    this.dbType = process.env.DB_TYPE || 'postgres';
+    // Check if we're in a Cloudflare Worker environment
+    const isCloudflare = typeof process === 'undefined' || typeof process.env === 'undefined';
+    
+    this.dbType = isCloudflare ? 'd1' : (process?.env?.DB_TYPE || 'postgres');
     this.db = null;
     this.initialized = false;
   }
@@ -18,7 +18,12 @@ class DatabaseAdapter {
   async initialize() {
     if (this.initialized) return;
 
-    if (this.dbType === 'sqlite' || this.dbType === 'd1') {
+    // Skip initialization for D1 - it will be set via setD1Database()
+    if (this.dbType === 'd1') {
+      return;
+    }
+
+    if (this.dbType === 'sqlite') {
       await this.initializeSQLite();
     } else {
       await this.initializePostgres();
