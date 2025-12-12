@@ -34,7 +34,9 @@ arc-raiders-companion/
 
 ## Run Locally
 
-**Prerequisites:** Node.js, PostgreSQL
+**Prerequisites:** Node.js, and either PostgreSQL, SQLite, or Cloudflare D1
+
+### Quick Start with SQLite (Easiest)
 
 1. Install dependencies:
    ```bash
@@ -42,35 +44,73 @@ arc-raiders-companion/
    cd server && npm install
    ```
 
-2. Set up environment variables (see `docs/SETUP.md`)
-
-3. Initialize the database:
+2. Set up environment (copy and edit):
    ```bash
-   psql -U postgres -f scripts/database-schema.sql
+   cd server
+   cp .env.example .env
+   # Edit .env and set: DB_TYPE=sqlite
+   ```
+
+3. Generate SQLite schema and create database:
+   ```bash
+   node scripts/convert-schema-to-sqlite.js
+   sqlite3 arc_raiders.db < database-schema-sqlite.sql
    ```
 
 4. Run the app:
    ```bash
    npm run dev           # Frontend (port 3002)
-   cd server && npm start # Backend (port 3001)
+   cd server && npm start # Backend (port 5001)
    ```
 
-Or use the quick start script:
-```bash
-./scripts/quickstart.sh
-```
+### With PostgreSQL (Production-Ready)
+
+1. Install dependencies:
+   ```bash
+   npm install
+   cd server && npm install
+   ```
+
+2. Set up environment (see `docs/DATABASE_SETUP.md`)
+
+3. Initialize the database:
+   ```bash
+   createdb arc_raiders_db
+   psql -d arc_raiders_db -f database-schema.sql
+   ```
+
+4. Run the app:
+   ```bash
+   npm run dev           # Frontend (port 3002)
+   cd server && npm start # Backend (port 5001)
+   ```
+
+### With Cloudflare D1 (Serverless)
+
+See [Cloudflare Deployment Guide](docs/CLOUDFLARE_DEPLOYMENT.md) for full instructions.
 
 ## Documentation
 
+- [Database Setup Guide](docs/DATABASE_SETUP.md) - PostgreSQL, SQLite, or D1
+- [Cloudflare Deployment](docs/CLOUDFLARE_DEPLOYMENT.md) - Deploy to Cloudflare Workers
 - [Setup Guide](docs/SETUP.md) - Detailed setup instructions
 - [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) - Feature overview
-- [Checklist](docs/CHECKLIST.md) - Development progress
+
+## Database Support
+
+This app supports multiple database backends:
+
+- **PostgreSQL** - Best for traditional deployments (default)
+- **SQLite** - Best for local development and testing
+- **Cloudflare D1** - Best for serverless deployments
+
+See [Database Setup Guide](docs/DATABASE_SETUP.md) for details.
 
 ## Tech Stack
 
 - **Frontend:** React, TypeScript, Vite, TailwindCSS
 - **Backend:** Node.js, Express
-- **Database:** PostgreSQL
+- **Database:** PostgreSQL / SQLite / Cloudflare D1 (flexible!)
 - **Auth:** JWT, bcrypt
 
 ## License
