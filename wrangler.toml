@@ -27,6 +27,7 @@ database_id = "9262edba-70da-4017-b02c-15495e41fb9e"
 NODE_ENV = "production"
 JWT_SECRET = "YOUR_JWT_SECRET_HERE"
 FRONTEND_URL = "https://arccompanion.5tourstudios.com"
+APP_VERSION = "1"
 
 # For email service, use Cloudflare Email Routing or external SMTP
 # Add these as secrets using: wrangler secret put <NAME>

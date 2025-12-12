@@ -1215,8 +1215,11 @@ const routes = [
 const protectedRoutes = routes.map(route => {
   return {
     ...route,
-    handler: (req, res) => {
-      return authenticateToken(req, res, () => route.handler(req, res));
+    handler: async (req, res) => {
+      const authenticated = await authenticateToken(req, res);
+      if (authenticated) {
+        return route.handler(req, res);
+      }
     }
   };
 });

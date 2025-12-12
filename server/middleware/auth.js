@@ -1,18 +1,23 @@
 import jwt from 'jsonwebtoken';
 
-export const authenticateToken = (req, res, next) => {
+export const authenticateToken = async (req, res) => {
   const authHeader = req.headers.get('authorization');
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    res.status(401).json({ error: 'Access token required' });
+    return false;
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.user = user; // { userId, email, username }
-    next();
+  return new Promise((resolve) => {
+    jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+      if (err) {
+        res.status(403).json({ error: 'Invalid or expired token' });
+        resolve(false);
+      } else {
+        req.user = user;
+        resolve(true);
+      }
+    });
   });
 };
