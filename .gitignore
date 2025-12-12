@@ -7,12 +7,40 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+package-lock.json
+
+# Build outputs
 dist
 dist-ssr
-*.local
+.vite
+
+# Environment variables
 .env
 .env.local
+.env.*.local
+server/.env
+
+# Database files
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+test.db
+local.db
+
+# Cloudflare
+.wrangler
+wrangler.toml.backup
+.dev.vars
+
+# Archive/temporary files
+archive/
+*.old
+*.bak
+*.tmp
+*.xlsx
 
 # Editor directories and files
 .vscode/*
@@ -24,3 +52,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# OS files
+Thumbs.db
+.AppleDouble
+.LSOverride
+
+# Secrets and sensitive data
+secrets/
+*.pem
+*.key
+*.cert
