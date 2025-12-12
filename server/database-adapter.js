@@ -49,7 +49,10 @@ class DatabaseAdapter {
     }
 
     // Use eval to avoid bundlers statically resolving the 'pg' module during worker builds
-    const pg = await eval("import('pg')");
+    const pg = await import('pg').catch(() => null);
+    if (!pg) {
+      throw new Error('Postgres module not available in this environment');
+    }
     const { Pool } = pg.default;
 
     const poolConfig = process.env.DATABASE_URL
