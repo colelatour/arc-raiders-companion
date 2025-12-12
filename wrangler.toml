@@ -3,7 +3,7 @@ main = "server/worker.js"
 compatibility_date = "2025-12-12"
 
 # Node.js compatibility for imports
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = []
 
 [site]
 bucket = "./dist"
@@ -11,8 +11,6 @@ bucket = "./dist"
 # Mark Node.js-specific modules as external (not bundled)
 [build]
 command = ""
-external_packages = []
-minify = true
 
 [[rules]]
 type = "ESModule"
