@@ -15,12 +15,16 @@ app.use('*', async (c, next) => {
   await next();
 });
 
+app.get('/', (c) => {
+  return c.html('<!doctype html><html><body><h1>ARC Raiders Companion</h1><p>API is available at <a href="/api/health">/api/health</a></p></body></html>');
+});
+
 app.get('/health', (c) => {
   return c.json({ status: 'ok', message: 'ARC Raiders API is running' });
 });
 
-app.route('/auth', auth);
-app.route('/raider', raider);
-app.route('/admin', admin);
+app.route('/api/auth', auth);
+app.route('/api/raider', raider);
+app.route('/api/admin', admin);
 
 export default app;
