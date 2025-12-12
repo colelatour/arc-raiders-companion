@@ -16,7 +16,7 @@ import { createServer } from './server-cloudflare.js';
 export default {
   async fetch(request, env, ctx) {
     // Get the Express-like app with D1 database binding
-    const app = createServer(env.DB);
+    const app = createServer(env);
     
     // Handle the request
     return await app.handleRequest(request, env, ctx);

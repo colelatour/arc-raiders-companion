@@ -1,9 +1,12 @@
 name = "arc-raiders-companion"
 main = "server/worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
 
 # Node.js compatibility for imports
 compatibility_flags = ["nodejs_compat"]
+
+[site]
+bucket = "./dist"
 
 # Mark Node.js-specific modules as external (not bundled)
 [build]
