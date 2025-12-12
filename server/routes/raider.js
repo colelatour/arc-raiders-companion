@@ -1,6 +1,12 @@
+import express from 'express';
 import pool from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import bcrypt from 'bcryptjs';
+
+const router = express.Router();
+
+// Apply authenticateToken middleware to all routes in this file
+router.use(authenticateToken);
 
 const routes = [
   {
@@ -1211,17 +1217,12 @@ const routes = [
   }
 ];
 
-// Apply authenticateToken middleware to all routes
-const protectedRoutes = routes.map(route => {
-  return {
-    ...route,
-    handler: async (req, res) => {
-      const authenticated = await authenticateToken(req, res);
-      if (authenticated) {
-        return route.handler(req, res);
-      }
-    }
-  };
+// Dynamically add routes to the router
+routes.forEach(route => {
+  const method = route.method.toLowerCase();
+  if (router[method]) {
+    router[method](route.path, route.handler);
+  }
 });
 
-export default protectedRoutes;
+export default router;

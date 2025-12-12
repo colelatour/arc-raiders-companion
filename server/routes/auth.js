@@ -1,7 +1,10 @@
+import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../database.js';
 import { generateVerificationToken, sendVerificationEmail, sendWelcomeEmail } from '../utils/emailService.js';
+
+const router = express.Router();
 
 const routes = [
   {
@@ -303,4 +306,12 @@ const routes = [
   }
 ];
 
-export default routes;
+// Dynamically add routes
+routes.forEach(route => {
+  const method = route.method.toLowerCase();
+  if (router[method]) {
+    router[method](route.path, route.handler);
+  }
+});
+
+export default router;

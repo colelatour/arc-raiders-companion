@@ -25,7 +25,7 @@ database_id = "9262edba-70da-4017-b02c-15495e41fb9e"
 # Environment Variables
 [vars]
 NODE_ENV = "production"
-JWT_SECRET = "YOUR_JWT_SECRET_HERE"
+JWT_SECRET = "arccompanionapi"
 FRONTEND_URL = "https://arccompanion.5tourstudios.com"
 APP_VERSION = "1"
 

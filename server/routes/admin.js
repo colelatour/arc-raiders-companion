@@ -1,6 +1,9 @@
+import express from 'express';
 import pool from '../database.js';
 import { authenticateToken } from '../middleware/auth.js';
 import bcrypt from 'bcryptjs';
+
+const router = express.Router();
 
 // Middleware to check if user is admin/manager
 const requireAdmin = async (req, res, next) => {
@@ -26,6 +29,10 @@ const requireAdmin = async (req, res, next) => {
     res.status(500).json({ error: 'Failed to verify permissions' });
   }
 };
+
+// Apply middleware to all routes in this file
+router.use(authenticateToken);
+router.use(requireAdmin);
 
 const routes = [
   {
@@ -615,16 +622,12 @@ const routes = [
   }
 ];
 
-// Apply middleware to all routes
-const protectedRoutes = routes.map(route => {
-  return {
-    ...route,
-    handler: (req, res, next) => {
-      return authenticateToken(req, res, () => {
-        return requireAdmin(req, res, () => route.handler(req, res));
-      });
-    }
-  };
+// Dynamically add routes to the router
+routes.forEach(route => {
+  const method = route.method.toLowerCase();
+  if (router[method]) {
+    router[method](route.path, route.handler);
+  }
 });
 
-export default protectedRoutes;
+export default router;
