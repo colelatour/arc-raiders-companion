@@ -33,7 +33,19 @@ class DatabaseAdapter {
   }
 
   async initializeSQLite() {
-    const Database = (await import('better-' + 'sqlite3')).default;
+    // Only initialize SQLite in Node.js/local environments
+    if (typeof process === 'undefined') {
+      throw new Error('SQLite initialization is not supported in Cloudflare Workers.');
+    }
+
+    // Build module name dynamically to avoid bundlers resolving it
+    const modName = String.fromCharCode(98,101,116,116,101,114,45,115,113,108,105,116,101,51); // 'better-sqlite3'
+    const sqliteMod = await import(modName).catch(() => null);
+    if (!sqliteMod) {
+      throw new Error('better-sqlite3 module not available in this environment');
+    }
+
+    const Database = sqliteMod.default;
     const dbPath = process.env.SQLITE_DB_PATH || './arc_raiders.db';
     
     this.db = new Database(dbPath);
