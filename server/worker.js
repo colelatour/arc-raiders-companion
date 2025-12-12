@@ -19,6 +19,10 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', message: 'ARC Raiders API is running' });
 });
 
+app.get('/api/*', (c) => {
+  return c.text('Catch-all route: Request received by Hono app!', 200);
+});
+
 app.route('/api/auth', auth);
 app.route('/api/raider', raider);
 app.route('/api/admin', admin);
