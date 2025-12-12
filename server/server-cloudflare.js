@@ -34,6 +34,7 @@ import dbAdapter from './database.js';
 import authRoutes from './routes/auth.js';
 import raiderRoutes from './routes/raider.js';
 import adminRoutes from './routes/admin.js';
+import { getEmbeddedAsset } from './embedded-assets.js';
 
 export function createServer(env) {
   const app = createApp();
@@ -71,9 +72,15 @@ export function createServer(env) {
 
   return {
     async handleRequest(request, env, ctx) {
-      // Monkey-patch request and response objects to be Express-compatible
-      const req = request;
-      req.body = request.method !== 'GET' ? await request.json().catch(() => ({})) : {};
+      // Create plain req object (don't mutate the original Request which is read-only)
+      const reqBody = request.method !== 'GET' ? await request.clone().json().catch(() => ({})) : {};
+      const req = {
+        method: request.method,
+        url: request.url,
+        headers: request.headers,
+        body: reqBody,
+        originalRequest: request
+      };
       
       const res = {
         _status: 200,
@@ -97,6 +104,7 @@ export function createServer(env) {
       try {
         // Find matching route and execute
         let match = false;
+        let responded = false;
         for (const layer of app._router.stack) {
           if (layer.route && request.url.match(layer.route.path)) {
             const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase());
@@ -145,6 +153,9 @@ export function createServer(env) {
                       // Synchronous handler; continue
                       return run(index + 1);
                     }
+
+                    // If handler wrote a body, stop
+                    if (res._body !== undefined) return resolve();
                   } catch (e) {
                     reject(e);
                   }
@@ -153,19 +164,33 @@ export function createServer(env) {
                 run();
               });
 
-              break;
+              // If a response body was set by middleware/handler, stop processing further layers
+              if (res._body !== undefined) {
+                responded = true;
+                break;
+              }
             }
           }
         }
         
-        if (!match) {
-          // Fallback to a 404 if no API route matches
+        // If no handler produced a response, fall back to serving static assets or produce a 404 for API paths
+        if (!responded) {
           const url = new URL(request.url);
           if (url.pathname.startsWith('/api/')) {
             res.status(404).json({ message: `API endpoint not found: ${request.method} ${url.pathname}` });
           } else {
-             // Serve static assets
-            return env.ASSETS.fetch(request);
+            // Serve static assets if the ASSETS binding exists
+            if (env && env.ASSETS && typeof env.ASSETS.fetch === 'function') {
+              return env.ASSETS.fetch(request);
+            }
+            // If ASSETS isn't available, try returning the embedded single-file index.html
+            const embedded = getEmbeddedAsset('/');
+            if (embedded) return embedded;
+            // If neither is available, return a helpful error so user knows to enable site assets in wrangler.toml
+            return new Response(`<html><body><h1>Static assets unavailable</h1><p>The ASSETS binding is not configured for this Worker and no embedded assets are present. Ensure "[site] bucket = \"./dist\"" is present in wrangler.toml and redeploy.</p></body></html>`, {
+              status: 502,
+              headers: { 'Content-Type': 'text/html' }
+            });
           }
         }
 
