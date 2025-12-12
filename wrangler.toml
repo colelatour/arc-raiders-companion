@@ -11,6 +11,8 @@ bucket = "./dist"
 # Mark Node.js-specific modules as external (not bundled)
 [build]
 command = ""
+external_packages = []
+minify = true
 
 [[rules]]
 type = "ESModule"
