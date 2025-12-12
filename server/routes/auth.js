@@ -1,4 +1,4 @@
-import express from 'express';
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../database.js';
@@ -306,12 +306,4 @@ const routes = [
   }
 ];
 
-// Dynamically add routes
-routes.forEach(route => {
-  const method = route.method.toLowerCase();
-  if (router[method]) {
-    router[method](route.path, route.handler);
-  }
-});
-
-export default router;
+export default routes;

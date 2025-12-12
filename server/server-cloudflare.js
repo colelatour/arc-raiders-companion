@@ -1,17 +1,47 @@
-import express from 'express';
+function createApp() {
+  const app = { _router: { stack: [] } };
+  const METHODS = ['get','post','put','delete','patch','options'];
+  app.use = function(a,b){
+    if(typeof a === 'string' && b){
+      const prefix = a;
+      const handler = b;
+      if(Array.isArray(handler)) {
+        handler.forEach(route => {
+          const method = route.method.toLowerCase();
+          app._router.stack.push({ route: { path: prefix + route.path, methods: { [method]: true } }, handle: route.handler });
+        });
+      } else if (typeof handler === 'function' || typeof handler === 'object') {
+        app._router.stack.push({ route: { path: prefix, methods: { get:true,post:true,put:true,delete:true,patch:true,options:true } }, handle: handler });
+      }
+    } else if (typeof a === 'function') {
+      app._router.stack.push({ route: { path: '.*', methods: { get:true,post:true,put:true,delete:true,patch:true,options:true } }, handle: a });
+    } else if (Array.isArray(a)) {
+      a.forEach(route => {
+        const method = route.method.toLowerCase();
+        app._router.stack.push({ route: { path: route.path, methods: { [method]: true } }, handle: route.handler });
+      });
+    }
+  };
+  METHODS.forEach(m => {
+    app[m] = function(path, handler){
+      app._router.stack.push({ route: { path, methods: { [m]: true } }, handle: handler });
+    };
+  });
+  return app;
+}
+
 import dbAdapter from './database.js';
 import authRoutes from './routes/auth.js';
 import raiderRoutes from './routes/raider.js';
 import adminRoutes from './routes/admin.js';
 
 export function createServer(env) {
-  const app = express();
+  const app = createApp();
 
   // Set D1 database
   dbAdapter.setD1Database(env.DB);
 
   // Middleware to handle JSON body parsing
-  app.use(express.json());
   
   // CORS middleware
   app.use((req, res, next) => {
