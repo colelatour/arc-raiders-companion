@@ -5,7 +5,7 @@ compatibility_date = "2024-01-01"
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
-database_name = "arccompanion
+database_name = "arccompanion"
 database_id = "9262edba-70da-4017-b02c-15495e41fb9e"
 
 # Environment Variables
