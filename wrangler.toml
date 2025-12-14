@@ -5,8 +5,7 @@ compatibility_date = "2025-12-12"
 # Node.js compatibility for imports
 compatibility_flags = ["nodejs_compat"]
 
-[site]
-bucket = "./dist"
+# site section removed to ensure the Worker handles root requests
 
 # Mark Node.js-specific modules as external (not bundled)
 [build]
