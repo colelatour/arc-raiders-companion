@@ -87,7 +87,14 @@ arc-raiders-companion/
 
 ### With Cloudflare D1 (Serverless)
 
-See [Cloudflare Deployment Guide](docs/CLOUDFLARE_DEPLOYMENT.md) for full instructions.
+See [Cloudflare Deployment Guide](docs/CLOUDFLARE_DEPLOYMENT.md) for full instructions. After applying the schema to D1, run the included migration helper to ensure app-specific updates are applied:
+
+```bash
+# Apply schema then run role migration helper
+wrangler d1 execute arc-raiders-db --file=./database-schema-sqlite.sql
+npm run migrate:d1
+```
+
 
 ## Documentation
 

@@ -1,0 +1,65 @@
+ARC Raiders Companion — Cloudflare D1 & Worker Setup Guide
+Generated: 2025-12-14T05:14:56.143Z
+
+Purpose
+This file contains the exact steps to prepare and deploy the app to Cloudflare Workers using a D1 database, including migrations, secrets, build, and verification. Do NOT commit secrets to source control.
+
+Prerequisites
+- Cloudflare account and Wrangler CLI installed and authenticated (wrangler login).
+- A D1 database already created in your Cloudflare account and its database_id present in wrangler.toml under [[d1_databases]] with binding = "DB".
+- Node.js 18+ and npm installed.
+
+Steps
+1) Convert/ensure schema (if not already generated):
+   node scripts/convert-schema-to-sqlite.js
+   # This creates database-schema-sqlite.sql (SQLite dialect compatible with D1)
+
+2) Apply schema to D1:
+   # Replace arc-raiders-db with your D1 name if different
+   wrangler d1 execute arc-raiders-db --file=./database-schema-sqlite.sql
+
+3) Run app-specific migrations (role/index defaults) using the included helper:
+   # This helper uses the Cloudflare REST API; it requires your CF account id and API token (ONLY for running this helper locally/CI)
+   export CF_ACCOUNT_ID=your_account_id
+   export CF_API_TOKEN=your_api_token
+   # (Optional) export D1_DATABASE_ID=your_database_id
+   npm run migrate:d1
+
+   Notes: The helper reads the database_id from wrangler.toml if D1_DATABASE_ID is not set. It will add the `role` column, ensure an index, set defaults, and print current users.
+
+4) Set runtime secrets for the Worker (interactive, do NOT put secrets in the repo):
+   # JWT_SECRET is required. When prompted, paste your JWT secret (generate one if needed).
+   wrangler secret put JWT_SECRET
+
+   # If you use email features, set EMAIL_USER/EMAIL_PASSWORD or other related secrets similarly.
+
+5) Build frontend and publish Worker:
+   npm run build
+   npm run deploy    # (runs `wrangler publish` via package.json)
+
+6) Verify deployment:
+   # Health endpoint
+   curl -i https://<your-worker-subdomain>/api/health
+
+   # To view logs while testing
+   wrangler tail
+
+   # Confirm frontend points to your Worker (VITE_API_URL in wrangler.toml or deployed env) and test login/register flows end-to-end.
+
+Local development notes
+- For local testing of Worker routes: wrangler dev
+- For local frontend dev: npm run dev
+- For local dev with a temporary JWT env variable (do not commit): export JWT_SECRET=your_jwt_secret
+
+CI/CD notes
+- Add JWT_SECRET and CF API token as repository secrets in CI (e.g., GitHub Actions). Use the migrate:d1 and wrangler publish steps in your CI workflow, passing secrets from the environment.
+
+Troubleshooting
+- "Database not found": confirm database_id in wrangler.toml matches your D1 database.
+- Migration/API errors: run npm run migrate:d1 and examine output; use wrangler tail for runtime logs.
+
+Security reminder
+- NEVER commit JWT_SECRET or API tokens to source control. Use wrangler secret put for production and repository/CI secrets for automated deploys.
+
+Contact
+If any step fails, capture the exact CLI output and provide it so issues can be diagnosed.

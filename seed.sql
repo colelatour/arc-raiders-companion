@@ -1,197 +1,5 @@
--- ARC Raiders Companion - Complete SQLite Database Setup
--- This script is idempotent and can be run on an empty database.
+-- Seed data for ARC Raiders Companion
 
--- Drop existing tables to ensure a clean slate
-DROP TABLE IF EXISTS favorite_raiders;
-DROP TABLE IF EXISTS raider_completed_expedition_items;
-DROP TABLE IF EXISTS raider_completed_expedition_parts;
-DROP TABLE IF EXISTS raider_completed_workbenches;
-DROP TABLE IF EXISTS raider_owned_blueprints;
-DROP TABLE IF EXISTS raider_completed_quests;
-DROP TABLE IF EXISTS raider_profiles;
-DROP TABLE IF EXISTS quest_rewards;
-DROP TABLE IF EXISTS quest_objectives;
-DROP TABLE IF EXISTS quests;
-DROP TABLE IF EXISTS expedition_requirements;
-DROP TABLE IF EXISTS expedition_parts;
-DROP TABLE IF EXISTS workbenches;
-DROP TABLE IF EXISTS crafting_items;
-DROP TABLE IF EXISTS safe_items;
-DROP TABLE IF EXISTS blueprints;
-DROP TABLE IF EXISTS users;
-
--- Table structure for users
-CREATE TABLE users (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  email TEXT NOT NULL UNIQUE,
-  username TEXT NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
-  role TEXT DEFAULT 'user',
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  last_login TEXT,
-  is_active INTEGER DEFAULT 1,
-  email_verified INTEGER DEFAULT 0,
-  verification_token TEXT,
-  verification_token_expires TEXT,
-  theme TEXT DEFAULT 'dark'
-);
-
--- Table structure for raider_profiles
-CREATE TABLE raider_profiles (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL UNIQUE,
-  raider_name TEXT NOT NULL UNIQUE,
-  expedition_level INTEGER DEFAULT 1,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  is_active INTEGER DEFAULT 1,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Table structure for blueprints
-CREATE TABLE blueprints (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  workshop TEXT NOT NULL,
-  recipe TEXT,
-  is_lootable INTEGER DEFAULT 0,
-  is_harvester_event INTEGER DEFAULT 0,
-  is_quest_reward INTEGER DEFAULT 0,
-  is_trails_reward INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
--- Table structure for workbenches
-CREATE TABLE workbenches (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  category TEXT NOT NULL,
-  level INTEGER NOT NULL,
-  display_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
--- Table structure for expedition_parts
-CREATE TABLE expedition_parts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  part_number INTEGER NOT NULL,
-  display_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
--- Table structure for expedition_requirements
-CREATE TABLE expedition_requirements (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  expedition_level INTEGER NOT NULL,
-  part_number INTEGER NOT NULL,
-  item_name TEXT NOT NULL,
-  quantity TEXT NOT NULL,
-  location TEXT NOT NULL,
-  display_order INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(expedition_level, part_number, item_name)
-);
-
--- Table structure for quests
-CREATE TABLE quests (
-  id INTEGER PRIMARY KEY,
-  name TEXT NOT NULL,
-  locations TEXT,
-  url TEXT,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-
--- Table structure for quest_objectives
-CREATE TABLE quest_objectives (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  quest_id INTEGER NOT NULL,
-  objective_text TEXT NOT NULL,
-  order_index INTEGER NOT NULL,
-  FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE,
-  UNIQUE (quest_id, order_index)
-);
-
--- Table structure for quest_rewards
-CREATE TABLE quest_rewards (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  quest_id INTEGER NOT NULL,
-  reward_text TEXT NOT NULL,
-  order_index INTEGER NOT NULL,
-  FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE,
-  UNIQUE (quest_id, order_index)
-);
-
--- Junction tables for player progress
-CREATE TABLE raider_completed_quests (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raider_profile_id INTEGER NOT NULL,
-  quest_id INTEGER NOT NULL,
-  completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (raider_profile_id) REFERENCES raider_profiles(id) ON DELETE CASCADE,
-  FOREIGN KEY (quest_id) REFERENCES quests(id) ON DELETE CASCADE,
-  UNIQUE (raider_profile_id, quest_id)
-);
-
-CREATE TABLE raider_owned_blueprints (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raider_profile_id INTEGER NOT NULL,
-  blueprint_id INTEGER NOT NULL,
-  acquired_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (raider_profile_id) REFERENCES raider_profiles(id) ON DELETE CASCADE,
-  FOREIGN KEY (blueprint_id) REFERENCES blueprints(id) ON DELETE CASCADE,
-  UNIQUE (raider_profile_id, blueprint_id)
-);
-
-CREATE TABLE raider_completed_workbenches (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raider_profile_id INTEGER NOT NULL,
-  workbench_id INTEGER NOT NULL,
-  completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (raider_profile_id) REFERENCES raider_profiles(id) ON DELETE CASCADE,
-  FOREIGN KEY (workbench_id) REFERENCES workbenches(id) ON DELETE CASCADE,
-  UNIQUE (raider_profile_id, workbench_id)
-);
-
-CREATE TABLE raider_completed_expedition_parts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raider_profile_id INTEGER NOT NULL,
-  part_name TEXT NOT NULL,
-  completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE (raider_profile_id, part_name)
-);
-
-CREATE TABLE raider_completed_expedition_items (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  raider_profile_id INTEGER NOT NULL,
-  part_name TEXT NOT NULL,
-  item_name TEXT NOT NULL,
-  completed_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (raider_profile_id) REFERENCES raider_profiles(id) ON DELETE CASCADE,
-  UNIQUE(raider_profile_id, part_name, item_name)
-);
-
-CREATE TABLE favorite_raiders (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
-  raider_profile_id INTEGER NOT NULL,
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (raider_profile_id) REFERENCES raider_profiles(id) ON DELETE CASCADE,
-  UNIQUE (user_id, raider_profile_id)
-);
-
-----------------------------------------------------
--- SEED DATA
-----------------------------------------------------
-
--- Default Admin User (Password: admin123)
-INSERT INTO users (id, email, username, password_hash, role, is_active, email_verified) VALUES (1, 'admin@arcraiders.com', 'admin', '$2b$10$z01AERBMPtKFZfFlny5AJelUd2WJ/5fLSy0Mz6hYp3wcyz9Lhr502', 'admin', 1, 1);
-INSERT INTO raider_profiles (id, user_id, raider_name, expedition_level) VALUES (1, 1, 'admin', 1);
-
--- Master Data for Blueprints
 INSERT INTO blueprints (id, name, workshop, recipe, is_lootable, is_harvester_event, is_quest_reward, is_trails_reward) VALUES
 (1, 'Anvil', 'Gunsmith 2', '5x Mech Comp, 5x Simple Gun Parts', 1, 0, 0, 1),
 (2, 'Anvil Splitter', 'Gunsmith 3', NULL, 1, 0, 0, 0),
@@ -237,8 +45,7 @@ INSERT INTO blueprints (id, name, workshop, recipe, is_lootable, is_harvester_ev
 (42, 'Vulcano', 'Gunsmith 3', '1x Mag Accel, 3x Heavy GP, 1x Exodus Mod', 1, 0, 0, 0),
 (43, 'Wolfpack', 'Explosives Station 3', '2x Expl Compound, 2x Sensors', 1, 0, 0, 0);
 
--- Master Data for Workbenches
-INSERT INTO workbenches (id, name, category, level, display_order) VALUES
+INSERT INTO workbenches (id, name, category, level, display_order) VALUES 
 (2, 'Scrappy 2', 'Scrappy', 2, 1),
 (3, 'Scrappy 3', 'Scrappy', 3, 1),
 (4, 'Scrappy 4', 'Scrappy', 4, 1),
@@ -259,15 +66,13 @@ INSERT INTO workbenches (id, name, category, level, display_order) VALUES
 (32, 'Refiner 2', 'Refiner', 2, 6),
 (33, 'Refiner 3', 'Refiner', 3, 6);
 
--- Master Data for Expedition Parts
-INSERT INTO expedition_parts (id, name, part_number, display_order) VALUES
+INSERT INTO expedition_parts (id, name, part_number, display_order) VALUES 
 (1, 'Part 1', 1, 1),
 (2, 'Part 2', 2, 2),
 (3, 'Part 3', 3, 3),
 (4, 'Part 4', 4, 4),
 (5, 'Part 5', 5, 5);
 
--- Master Data for Expedition Requirements
 INSERT INTO expedition_requirements (expedition_level, part_number, item_name, quantity, location, display_order) VALUES
 (1, 1, 'Metal Parts', '150', 'Basic Materials', 1),
 (1, 1, 'Rubber Parts', '200', 'Basic Materials', 2),
@@ -291,10 +96,11 @@ INSERT INTO expedition_requirements (expedition_level, part_number, item_name, q
 (1, 5, 'Materials', '300k Value', 'Turn in items', 4);
 
 INSERT INTO expedition_requirements (expedition_level, part_number, item_name, quantity, location, display_order)
-SELECT 2, part_number, item_name, quantity, location, display_order FROM expedition_requirements WHERE expedition_level = 1;
+SELECT 2, part_number, item_name, quantity, location, display_order
+FROM expedition_requirements
+WHERE expedition_level = 1;
 
--- Master Data for Quests
-INSERT INTO quests (id, name, locations, url) VALUES
+INSERT INTO quests (id, name, locations, url) VALUES 
 (1, 'Picking Up The Pieces', 'Hydroponic Dome, Dam', 'https://patchcrazy.co.uk/picking-up-the-pieces-quest-guide-arc-raiders/'),
 (2, 'Clearer Skies', 'Dam Battlegrounds', 'https://patchcrazy.co.uk/clearer-skies-quest-guide-arc-raiders/'),
 (3, 'Trash Into Treasure', 'Research Building, Dam', 'https://patchcrazy.co.uk/trash-into-treasure-quest-guide-arc-raiders/'),

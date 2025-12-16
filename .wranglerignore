@@ -1,0 +1,6 @@
+# Exclude development scripts and Postgres-only helpers from Worker uploads
+# These files are for local/CI migrations and should not be bundled into the Worker
+scripts/
+server/migrate-roles.js
+server/migrate-roles-d1.js
+server/run-migration.js

@@ -29,7 +29,7 @@ export default function VerifyEmailPage() {
       console.log('Attempting to verify with token:', token);
 
       try {
-        const response = await axios.get(`${API_URL}/auth/verify-email/${token}`);
+const response = await axios.get(`/api/auth/verify-email/${token}`);
         console.log('Verification response:', response.data);
         setStatus('success');
         setMessage(response.data.message || 'Email verified successfully!');

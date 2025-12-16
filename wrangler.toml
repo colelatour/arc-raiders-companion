@@ -1,39 +1,23 @@
+# Cloudflare Pages Configuration
 name = "arc-raiders-companion"
-main = "server/worker.js"
-compatibility_date = "2025-12-12"
+compatibility_date = "2025-12-14"
 
-# Node.js compatibility for imports
-compatibility_flags = ["nodejs_compat"]
+# --- Pages Settings ---
+# This tells Wrangler where your frontend build output is.
+pages_build_output_dir = "dist"
 
-# site section removed to ensure the Worker handles root requests
-
-# Mark Node.js-specific modules as external (not bundled)
-[build]
-command = ""
-
-[[rules]]
-type = "ESModule"
-globs = ["**/*.js"]
+# --- Bindings ---
 
 # D1 Database Binding
+# This makes your D1 database available to your Functions at `env.DB`
 [[d1_databases]]
 binding = "DB"
 database_name = "arccompanion"
-database_id = "9262edba-70da-4017-b02c-15495e41fb9e"
+database_id = "b04bbbc5-262e-4ec2-8942-fd43e89204f4"
 
-# Environment Variables
+# Environment Variables for Functions
+# For production, secrets like JWT_SECRET should be set in the Cloudflare Pages dashboard.
+# For local dev with `wrangler pages dev`, you can use a .dev.vars file or `wrangler secret put`.
 [vars]
-NODE_ENV = "production"
-JWT_SECRET = "arccompanionapi"
-FRONTEND_URL = "https://arc-raiders-companion.dlatour.workers.dev"
-VITE_API_URL = "https://arc-raiders-companion.dlatour.workers.dev/api"
+FRONTEND_URL = "https://arc-raiders-companion.pages.dev"
 APP_VERSION = "1"
-
-# For email service, use Cloudflare Email Routing or external SMTP
-# Add these as secrets using: wrangler secret put <NAME>
-# EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD, EMAIL_FROM
-
-# Routes (optional - specify which routes should be handled by this worker)
-# routes = [
-#   { pattern = "api.yourdomain.com/*", zone_name = "yourdomain.com" }
-# ]

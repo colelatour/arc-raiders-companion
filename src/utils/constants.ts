@@ -1,4 +1,4 @@
-import { Quest, Blueprint, CraftingItem, SafeItem } from './types';
+import { Quest, Blueprint, CraftingItem, SafeItem } from '../types/types';
 
 export const QUESTS: Quest[] = [
   { id: 1, name: "Picking Up The Pieces", objectives: ["Visit any area with a loot category icon", "Loot 3 containers"], locations: "Hydroponic Dome, Dam", rewards: ["1x Rattler III", "80x Medium Ammo"] },

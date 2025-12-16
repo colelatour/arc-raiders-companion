@@ -62,8 +62,7 @@ export const LoginPage: React.FC = () => {
     setSuccessMessage('');
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || '/api';
-      const response = await fetch(`${API_URL}/auth/resend-verification`, {
+      const response = await fetch(`/api/auth/resend-verification`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -72,7 +71,11 @@ export const LoginPage: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to resend verification email');
+        let errorMessage = 'Failed to resend verification email';
+        if (data && typeof data === 'object' && 'error' in data && typeof data.error === 'string') {
+          errorMessage = data.error;
+        }
+        throw new Error(errorMessage);
       }
 
       setSuccessMessage('✅ Verification email sent! Please check your inbox.');

@@ -58,9 +58,10 @@ This creates `database-schema-sqlite.sql`.
 
 ### 5. Initialize Database
 
-Apply the schema to your D1 database:
+Apply the schema to your D1 database (recommended):
 
 ```bash
+# Use the wrangler d1 helper to apply the generated SQLite schema
 wrangler d1 execute arc-raiders-db --file=./database-schema-sqlite.sql
 ```
 
@@ -70,18 +71,42 @@ Verify tables were created:
 wrangler d1 execute arc-raiders-db --command="SELECT name FROM sqlite_master WHERE type='table'"
 ```
 
+### 5.a Run role migration helper
+
+After applying the base schema, run the included D1 migration helper to ensure app-specific upgrades (adds the `role` column, indexes, and default values).
+
+This script uses the Cloudflare D1 REST API and requires CF_ACCOUNT_ID and CF_API_TOKEN (or CLOUDFLARE_ACCOUNT_ID/CLOUDFLARE_API_TOKEN). The D1 database_id will be read from your `wrangler.toml` if not provided via D1_DATABASE_ID.
+
+```bash
+# Export your Cloudflare account info and API token, then run the migration
+export CF_ACCOUNT_ID=your_account_id
+export CF_API_TOKEN=your_api_token
+# (Optional) export D1_DATABASE_ID=your_database_id
+npm run migrate:d1
+```
+
+If you prefer to run SQL directly, you can also use `wrangler d1 execute` for ad-hoc commands.
+
 ### 6. Set Environment Variables
 
 Set secrets (sensitive values):
 
 ```bash
-# Set JWT secret
+# Set JWT secret (required)
 wrangler secret put JWT_SECRET
 # Paste your JWT secret when prompted
 
 # Set email credentials (if using email)
 wrangler secret put EMAIL_PASSWORD
 wrangler secret put EMAIL_USER
+```
+
+For running the D1 migration helper locally you will also need a Cloudflare API token and account id (used only by the migration helper, not required by the Worker runtime):
+
+```bash
+export CF_ACCOUNT_ID=your_account_id
+export CF_API_TOKEN=your_api_token
+# (Optional) export D1_DATABASE_ID=your_database_id if not already set in wrangler.toml
 ```
 
 Update public environment variables in `wrangler.toml`:
