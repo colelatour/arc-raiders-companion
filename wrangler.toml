@@ -13,7 +13,7 @@ pages_build_output_dir = "dist"
 [[d1_databases]]
 binding = "DB"
 database_name = "arccompanion"
-database_id = "b04bbbc5-262e-4ec2-8942-fd43e89204f4"
+database_id = "7317773f-060e-4c6c-8aab-e30968af1979"
 
 # Environment Variables for Functions
 # For production, secrets like JWT_SECRET should be set in the Cloudflare Pages dashboard.
