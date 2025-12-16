@@ -394,10 +394,11 @@ profileRoutes.get('/:profileId/expedition-parts', async (c) => {
     const profileId = parseInt(c.req.param('profileId'), 10);
     const db = c.env.DB;
     try {
-        // This table stores the name directly, so no join is needed.
         const { results } = await db.prepare(
-            `SELECT part_name FROM raider_completed_expedition_parts
-             WHERE raider_profile_id = ?1`
+            `SELECT ep.name as part_name
+             FROM raider_completed_expedition_parts rcep
+             JOIN expedition_parts ep ON rcep.expedition_part_id = ep.id
+             WHERE rcep.raider_profile_id = ?1`
         ).bind(profileId).all();
         return c.json({ completedExpeditionParts: results.map((r: any) => r.part_name) });
     } catch (error: any) {
