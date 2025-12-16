@@ -113,6 +113,7 @@ app.get('/verify', authMiddleware, (c: Context) => {
     email: payload.email,
     username: payload.username,
     role: payload.role,
+    theme: payload.theme || 'dark', // Ensure theme is always included
   };
 
   return c.json({ user: userForFrontend }, 200);
