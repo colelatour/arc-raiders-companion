@@ -100,7 +100,20 @@ app.post('/login', async (c) => {
 
 app.get('/verify', authMiddleware, (c: Context) => {
   const payload = c.get('jwtPayload');
-  return c.json({ user: payload }, 200);
+  
+  if (!payload) {
+    return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+  }
+
+  // Map JWT payload to the shape the frontend User interface expects
+  const userForFrontend = {
+    id: payload.sub,
+    email: payload.email,
+    username: payload.username,
+    role: payload.role,
+  };
+
+  return c.json({ user: userForFrontend }, 200);
 });
 
 export default app;
