@@ -31,6 +31,12 @@ const verifyProfileOwnership = async (c: any, profileId: number): Promise<boolea
 app.get('/profiles', async (c) => {
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    // Defensive check to ensure payload exists
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         const { results } = await db.prepare(
             `SELECT id, expedition_level, created_at, updated_at 
@@ -49,6 +55,11 @@ app.get('/profiles', async (c) => {
 app.post('/profiles', async (c) => {
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         const existing = await db.prepare('SELECT id FROM raider_profiles WHERE user_id = ?1').bind(payload.sub).first();
         if (existing) {
@@ -82,6 +93,10 @@ app.get('/search', async (c) => {
     const { raiderName } = c.req.query();
     const db = c.env.DB;
     const payload = c.get('jwtPayload');
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
 
     if (!raiderName) {
         return c.json({ error: 'Raider name query is required' }, 400);
@@ -422,6 +437,11 @@ app.route('/profiles', profileRoutes);
 app.get('/favorites', async (c) => {
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         const { results } = await db.prepare(
             `SELECT rp.id, rp.expedition_level, u.username, fr.created_at as favorited_at
@@ -442,6 +462,11 @@ app.post('/favorites/:raiderProfileId', async (c) => {
     const raiderProfileId = parseInt(c.req.param('raiderProfileId'), 10);
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         const profile = await db.prepare('SELECT id FROM raider_profiles WHERE id = ?1 AND is_active = true').bind(raiderProfileId).first();
         if (!profile) {
@@ -461,6 +486,11 @@ app.delete('/favorites/:raiderProfileId', async (c) => {
     const raiderProfileId = parseInt(c.req.param('raiderProfileId'), 10);
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         await db.prepare('DELETE FROM favorite_raiders WHERE user_id = ?1 AND raider_profile_id = ?2').bind(payload.sub, raiderProfileId).run();
         return c.json({ message: 'Raider removed from favorites' });
@@ -478,6 +508,10 @@ app.put('/settings/password', async (c) => {
     const { currentPassword, newPassword } = await c.req.json();
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
 
     if (!currentPassword || !newPassword || newPassword.length < 6) {
         return c.json({ error: 'Both passwords are required and the new password must be at least 6 characters.' }, 400);
@@ -510,6 +544,10 @@ app.put('/settings/theme', async (c) => {
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
 
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     if (theme !== 'light' && theme !== 'dark') {
         return c.json({ error: 'Invalid theme. Must be "light" or "dark"' }, 400);
     }
@@ -533,6 +571,11 @@ app.delete('/settings/account', (c) => c.json({ message: 'DELETE /settings/accou
 app.get('/expedition-requirements', async (c) => {
     const payload = c.get('jwtPayload');
     const db = c.env.DB;
+
+    if (!payload) {
+        return c.json({ error: 'Unauthorized: JWT payload missing.' }, 401);
+    }
+
     try {
         const profile = await db.prepare(
             'SELECT expedition_level FROM raider_profiles WHERE user_id = ?1 AND is_active = true LIMIT 1'
