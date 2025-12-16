@@ -30,7 +30,7 @@ app.post('/register', async (c) => {
 
     // Hash password with bcrypt
     const saltRounds = 10;
-    const passwordHash = await d.hash(password, saltRounds);
+    const passwordHash = await bcrypt.hash(password, saltRounds);
 
     await db.prepare(
       'INSERT INTO users (email, username, password_hash) VALUES (?1, ?2, ?3)'
@@ -62,7 +62,7 @@ app.post('/login', async (c) => {
         }
 
         // Verify password with bcrypt
-        const isValidPassword = await d.compare(password, user.password_hash);
+        const isValidPassword = await bcrypt.compare(password, user.password_hash);
         if (!isValidPassword) {
             return c.json({ error: 'Invalid credentials' }, 401);
         }
