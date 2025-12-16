@@ -221,6 +221,5 @@ CREATE TABLE favorite_raiders (
 );
 
 -- === SEED DATA ===
--- Default Admin User (Password: admin123)
-INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at, is_active, email_verified) VALUES (1, 'admin@arcraiders.com', 'admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 1);
--- Note: The password 'admin123' is hashed with the insecure SHA-256 function from the app for consistency.
+-- Default Admin User (Password: testpassword123)
+INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at, is_active, email_verified) VALUES (1, 'admin@arcraiders.com', 'admin', '$2b$10$GBKhfu5NMPt77FFDto2VuOk6cPMf0/BnGMldvj5NqpiNeYxCQUkCu', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 1);
