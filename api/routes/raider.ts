@@ -19,6 +19,9 @@ app.use('*', authMiddleware);
 // Helper to check ownership of a profile
 const verifyProfileOwnership = async (c: any, profileId: number): Promise<boolean> => {
     const payload = c.get('jwtPayload');
+    if (!payload) {
+        return false;
+    }
     const db = c.env.DB;
     const profile = await db.prepare(
         'SELECT id FROM raider_profiles WHERE id = ?1 AND user_id = ?2'
@@ -500,8 +503,6 @@ app.delete('/favorites/:raiderProfileId', async (c) => {
     }
 });
 
-
-import * as bcrypt from 'bcryptjs';
 
 // Settings
 app.put('/settings/password', async (c) => {
