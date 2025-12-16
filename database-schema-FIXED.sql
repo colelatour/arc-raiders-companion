@@ -32,9 +32,6 @@ CREATE TABLE users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP,
   is_active BOOLEAN DEFAULT true,
-  email_verified BOOLEAN DEFAULT false,
-  verification_token VARCHAR(255),
-  verification_token_expires TIMESTAMP,
   theme VARCHAR(10) DEFAULT 'dark',
   UNIQUE (email),
   UNIQUE (username)
@@ -221,5 +218,4 @@ CREATE TABLE favorite_raiders (
 );
 
 -- === SEED DATA ===
--- Default Admin User (Password: testpassword123)
-INSERT INTO users (id, email, username, password_hash, role, created_at, updated_at, is_active, email_verified) VALUES (1, 'admin@arcraiders.com', 'admin', '$2b$10$GBKhfu5NMPt77FFDto2VuOk6cPMf0/BnGMldvj5NqpiNeYxCQUkCu', 'admin', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1, 1);
+-- No default users are created. Please register a new user after setting up the database.
