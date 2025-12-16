@@ -1,8 +1,10 @@
 // src/routes/auth.ts
 import { Hono } from 'hono';
 import { sign } from 'hono/jwt';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { Bindings } from '../index';
+import { authMiddleware } from '../middleware/auth';
+import { Context } from 'hono';
 
 const app = new Hono<{ Bindings: Bindings }>();
 
@@ -28,7 +30,7 @@ app.post('/register', async (c) => {
 
     // Hash password with bcrypt
     const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
+    const passwordHash = await d.hash(password, saltRounds);
 
     await db.prepare(
       'INSERT INTO users (email, username, password_hash) VALUES (?1, ?2, ?3)'
@@ -60,7 +62,7 @@ app.post('/login', async (c) => {
         }
 
         // Verify password with bcrypt
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
+        const isValidPassword = await d.compare(password, user.password_hash);
         if (!isValidPassword) {
             return c.json({ error: 'Invalid credentials' }, 401);
         }
@@ -94,6 +96,11 @@ app.post('/login', async (c) => {
         console.error('Login error:', error.message);
         return c.json({ error: 'Server error during login' }, 500);
     }
+});
+
+app.get('/verify', authMiddleware, (c: Context) => {
+  const payload = c.get('jwtPayload');
+  return c.json({ user: payload }, 200);
 });
 
 export default app;

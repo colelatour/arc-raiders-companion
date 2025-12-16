@@ -2,6 +2,7 @@
 import { Hono } from 'hono';
 import { Bindings } from '../index';
 import { authMiddleware } from '../middleware/auth.ts';
+import * as bcrypt from 'bcryptjs';
 
 // Define the shape of the JWT payload that our middleware adds to the context
 type JWTPayload = {
@@ -404,6 +405,10 @@ profileRoutes.get('/:profileId/expedition-items', async (c) => {
     }
 });
 
+profileRoutes.post('/:profileId/expedition/complete', (c) => c.json({ message: 'POST /:profileId/expedition/complete not implemented' }, 501));
+profileRoutes.post('/:profileId/expedition-parts/:partName', (c) => c.json({ message: `POST /:profileId/expedition-parts/${c.req.param('partName')} not implemented` }, 501));
+
+
 
 // Mount the sub-router for profile-specific actions
 app.route('/profiles', profileRoutes);
@@ -466,20 +471,9 @@ app.delete('/favorites/:raiderProfileId', async (c) => {
 });
 
 
-// Settings
-// Note: We need the password functions for the password update route
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-async function comparePassword(password: string, hash: string): Promise<boolean> {
-    const passwordHash = await hashPassword(password);
-    return passwordHash === hash;
-}
+import * as bcrypt from 'bcryptjs';
 
+// Settings
 app.put('/settings/password', async (c) => {
     const { currentPassword, newPassword } = await c.req.json();
     const payload = c.get('jwtPayload');
@@ -495,12 +489,13 @@ app.put('/settings/password', async (c) => {
             return c.json({ error: 'User not found' }, 404);
         }
 
-        const isValid = await comparePassword(currentPassword, user.password_hash);
+        const isValid = await bcrypt.compare(currentPassword, user.password_hash);
         if (!isValid) {
             return c.json({ error: 'Current password is incorrect' }, 401);
         }
 
-        const newPasswordHash = await hashPassword(newPassword);
+        const saltRounds = 10;
+        const newPasswordHash = await bcrypt.hash(newPassword, saltRounds);
         await db.prepare('UPDATE users SET password_hash = ?1 WHERE id = ?2').bind(newPasswordHash, payload.sub).run();
 
         return c.json({ message: 'Password updated successfully' });
@@ -527,6 +522,11 @@ app.put('/settings/theme', async (c) => {
         return c.json({ error: 'Failed to update theme' }, 500);
     }
 });
+
+app.put('/settings/username', (c) => c.json({ message: 'PUT /settings/username not implemented' }, 501));
+app.post('/settings/reset', (c) => c.json({ message: 'POST /settings/reset not implemented' }, 501));
+app.delete('/settings/account', (c) => c.json({ message: 'DELETE /settings/account not implemented' }, 501));
+
 
 
 // Expedition Requirements
