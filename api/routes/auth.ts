@@ -32,8 +32,9 @@ app.post('/register', async (c) => {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // Create user and mark as email verified
     await db.prepare(
-      'INSERT INTO users (email, username, password_hash) VALUES (?1, ?2, ?3)'
+      'INSERT INTO users (email, username, password_hash, email_verified) VALUES (?1, ?2, ?3, true)'
     ).bind(email, username, passwordHash).run();
 
     return c.json({ message: 'Registration successful! You can now log in.' }, 201);
@@ -54,8 +55,8 @@ app.post('/login', async (c) => {
 
     try {
         const user = await db.prepare(
-            'SELECT id, username, email, password_hash, role, theme FROM users WHERE email = ?1 AND is_active = true'
-        ).bind(email).first<{ id: number; username: string; email: string; password_hash: string; role: string; theme: string }>();
+            'SELECT id, username, email, password_hash, role, theme, email_verified FROM users WHERE email = ?1 AND is_active = true'
+        ).bind(email).first<{ id: number; username: string; email: string; password_hash: string; role: string; theme: string; email_verified: boolean }>();
 
         if (!user) {
             return c.json({ error: 'Invalid credentials' }, 401);
@@ -67,9 +68,16 @@ app.post('/login', async (c) => {
             return c.json({ error: 'Invalid credentials' }, 401);
         }
 
-        await db.prepare(
-            'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?1'
-        ).bind(user.id).run();
+        // Update last login and mark user as verified
+        if (!user.email_verified) {
+          await db.prepare(
+              'UPDATE users SET last_login = CURRENT_TIMESTAMP, email_verified = true WHERE id = ?1'
+          ).bind(user.id).run();
+        } else {
+          await db.prepare(
+              'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?1'
+          ).bind(user.id).run();
+        }
 
         const payload = {
             sub: user.id,
